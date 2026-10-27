@@ -37,7 +37,8 @@ public final class RoomsFile {
                 loadedStamp = (try? fm.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
                 return .created
             } catch {
-                return .failed("房间名单写不进 \(url.path)：\(error.localizedDescription)")
+                return .failed(L("房间名单写不进 \(url.path)：\(error.localizedDescription)",
+                                 "Couldn't write the room list to \(url.path): \(error.localizedDescription)"))
             }
         }
         let stamp = attributes[.modificationDate] as? Date
@@ -48,7 +49,7 @@ public final class RoomsFile {
             return .loaded
         } catch {
             let reason = (error as? RoomsConfig.ParseError)?.description ?? error.localizedDescription
-            return .failed("rooms.json 写错了：\(reason)。先按上一版排座")
+            return .failed(L("rooms.json 写错了：\(reason)。先按上一版排座", "rooms.json has a mistake: \(reason). Keeping the previous seating"))
         }
     }
 }

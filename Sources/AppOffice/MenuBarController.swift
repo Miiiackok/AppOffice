@@ -4,16 +4,21 @@ import OfficeCore
 /// 菜单栏图标和菜单；菜单每次打开时现建，开关状态总是最新的
 final class MenuBarController: NSObject, NSMenuDelegate {
     struct Toggle {
-        let title: String
+        /// 每次打开菜单时取，切换语言后跟着变
+        let title: () -> String
         let get: () -> Bool
         let set: (Bool) -> Void
     }
 
-    static let stateTitles: [(EmployeeState, String)] = [
-        (.hung, "🚽 上厕所（卡住）"), (.offline, "🏋️ 健身（断网）"), (.launching, "🎒 刚到公司"),
-        (.focused, "⌨️ 疯狂干活"), (.snacking, "🍪 吃零食"), (.working, "💻 干活"),
-        (.idle, "☕ 半摸鱼"), (.resting, "🎮 休闲区（很久没用）"), (.off, "😴 摸鱼（没打开）"),
-    ]
+    static var stateTitles: [(EmployeeState, String)] {
+        [
+            (.hung, L("🚽 上厕所（卡住）", "🚽 Restroom (frozen)")), (.offline, L("🏋️ 健身（断网）", "🏋️ Gym (offline)")),
+            (.launching, L("🎒 刚到公司", "🎒 Arriving")), (.focused, L("⌨️ 疯狂干活", "⌨️ Typing like mad")),
+            (.snacking, L("🍪 吃零食", "🍪 Snacking")), (.working, L("💻 干活", "💻 Working")),
+            (.idle, L("☕ 半摸鱼", "☕ Idle")), (.resting, L("🎮 休闲区（很久没用）", "🎮 Lounge (long unused)")),
+            (.off, L("😴 摸鱼（没打开）", "😴 Slacking (not running)")),
+        ]
+    }
 
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let toggles: [Toggle]
@@ -23,6 +28,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let simulated: () -> [String: EmployeeState]
     private let simulate: (String, EmployeeState?) -> Void
     private let editRooms: () -> Void
+    /// "auto"（跟随系统）、"zh"、"en"
+    private let language: () -> String
+    private let setLanguage: (String) -> Void
 
     init(toggles: [Toggle],
          hangDetectionAvailable: @escaping () -> Bool,
@@ -30,7 +38,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
          employees: @escaping () -> [(id: String, name: String)],
          simulated: @escaping () -> [String: EmployeeState],
          simulate: @escaping (String, EmployeeState?) -> Void,
-         editRooms: @escaping () -> Void) {
+         editRooms: @escaping () -> Void,
+         language: @escaping () -> String,
+         setLanguage: @escaping (String) -> Void) {
         self.toggles = toggles
         self.hangDetectionAvailable = hangDetectionAvailable
         self.enableHangDetection = enableHangDetection
@@ -38,6 +48,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         self.simulated = simulated
         self.simulate = simulate
         self.editRooms = editRooms
+        self.language = language
+        self.setLanguage = setLanguage
         super.init()
         let image = NSImage(systemSymbolName: "building.2", accessibilityDescription: "AppOffice")
         image?.isTemplate = true
@@ -50,30 +62,33 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         for (index, toggle) in toggles.enumerated() {
-            let entry = NSMenuItem(title: toggle.title, action: #selector(flip(_:)), keyEquivalent: "")
+            let entry = NSMenuItem(title: toggle.title(), action: #selector(flip(_:)), keyEquivalent: "")
             entry.target = self
             entry.tag = index
             entry.state = toggle.get() ? .on : .off
             menu.addItem(entry)
         }
         menu.addItem(.separator())
-        let rooms = NSMenuItem(title: "编辑房间名单…", action: #selector(openRooms), keyEquivalent: "")
+        let rooms = NSMenuItem(title: L("编辑房间名单…", "Edit Room List…"), action: #selector(openRooms), keyEquivalent: "")
         rooms.target = self
         menu.addItem(rooms)
+        let lang = NSMenuItem(title: "语言 / Language", action: nil, keyEquivalent: "")
+        lang.submenu = languageMenu()
+        menu.addItem(lang)
         if !hangDetectionAvailable() {
-            let entry = NSMenuItem(title: "开启卡顿检测…", action: #selector(askForAccessibility), keyEquivalent: "")
+            let entry = NSMenuItem(title: L("开启卡顿检测…", "Enable Hang Detection…"), action: #selector(askForAccessibility), keyEquivalent: "")
             entry.target = self
             menu.addItem(entry)
         }
-        let debug = NSMenuItem(title: "调试", action: nil, keyEquivalent: "")
+        let debug = NSMenuItem(title: L("调试", "Debug"), action: nil, keyEquivalent: "")
         let debugMenu = NSMenu()
-        let simulateItem = NSMenuItem(title: "模拟状态", action: nil, keyEquivalent: "")
+        let simulateItem = NSMenuItem(title: L("模拟状态", "Simulate State"), action: nil, keyEquivalent: "")
         simulateItem.submenu = simulationMenu()
         debugMenu.addItem(simulateItem)
         debug.submenu = debugMenu
         menu.addItem(debug)
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "退出 AppOffice", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: L("退出 AppOffice", "Quit AppOffice"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
 
     private func simulationMenu() -> NSMenu {
@@ -83,7 +98,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let current = simulated()
         for employee in employees() {
             let forced = current[employee.id]
-            let person = NSMenuItem(title: forced == nil ? employee.name : "\(employee.name)（模拟中）", action: nil, keyEquivalent: "")
+            let person = NSMenuItem(title: forced == nil ? employee.name : L("\(employee.name)（模拟中）", "\(employee.name) (simulated)"), action: nil, keyEquivalent: "")
             person.isEnabled = true
             let states = NSMenu()
             states.autoenablesItems = false
@@ -96,7 +111,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 states.addItem(entry)
             }
             states.addItem(.separator())
-            let clear = NSMenuItem(title: "取消模拟", action: #selector(pickState(_:)), keyEquivalent: "")
+            let clear = NSMenuItem(title: L("取消模拟", "Stop Simulating"), action: #selector(pickState(_:)), keyEquivalent: "")
             clear.target = self
             clear.isEnabled = true
             clear.representedObject = [employee.id, ""]
@@ -105,11 +120,29 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             menu.addItem(person)
         }
         menu.addItem(.separator())
-        let clearAll = NSMenuItem(title: "取消全部模拟", action: #selector(clearAllSimulations), keyEquivalent: "")
+        let clearAll = NSMenuItem(title: L("取消全部模拟", "Stop All Simulations"), action: #selector(clearAllSimulations), keyEquivalent: "")
         clearAll.target = self
         clearAll.isEnabled = !current.isEmpty
         menu.addItem(clearAll)
         return menu
+    }
+
+    private func languageMenu() -> NSMenu {
+        let menu = NSMenu()
+        let current = language()
+        for (value, title) in [("auto", L("跟随系统", "Follow System")), ("zh", "中文"), ("en", "English")] {
+            let entry = NSMenuItem(title: title, action: #selector(pickLanguage(_:)), keyEquivalent: "")
+            entry.target = self
+            entry.representedObject = value
+            entry.state = current == value ? .on : .off
+            menu.addItem(entry)
+        }
+        return menu
+    }
+
+    @objc private func pickLanguage(_ sender: NSMenuItem) {
+        guard let value = sender.representedObject as? String else { return }
+        setLanguage(value)
     }
 
     @objc private func flip(_ sender: NSMenuItem) {

@@ -104,7 +104,8 @@
 
 | 操作 | 结果 |
 |---|---|
-| 单击小人 | 弹出名片：名字、图标、状态、CPU、内存、已运行时长 |
+| 鼠标移到小人上 | 弹出名片：名字、图标、状态、CPU、内存、已运行时长；移开收起（浮窗不是 key window 时网页收不到 mousemove，由 Swift 的 tracking area 把鼠标位置转给 `window.office.hover(x, y)`） |
+| 单击小人 | 名片钉住，点空白处才收 |
 | 双击小人，或双击他的座位 | 该 app 已运行则切到前台；未运行（`off`）则启动 |
 | 把小人拖到大门 | 对该 app 发送正常退出请求（等同 ⌘Q；未保存文档由 app 自己弹窗处理） |
 | 菜单栏图标 | 显示/隐藏浮窗、钉在最上层、透明模式（鼠标不在窗上时 50% 透明）、开启卡顿检测、调试 → 模拟状态、退出 |
@@ -158,7 +159,7 @@ Swift → JS（`window.office.receive(msg)`）：
 
 ```json
 { "type": "roster",
-  "rooms": [{ "name": "大办公室", "kind": "offices" }, { "name": "Dock 部", "kind": "shared" }],
+  "rooms": [{ "name": "offices", "kind": "offices" }, { "name": "Dock 部", "kind": "shared" }],
   "employees": [{ "id": "com.apple.Safari", "name": "Safari", "kind": "staff",
                   "room": 1, "seat": 2, "color": "#3D7BFD", "iconPNG": "<base64, 64×64>" }] }
 
@@ -170,14 +171,17 @@ Swift → JS（`window.office.receive(msg)`）：
 
 - `roster` 只在名单变化时发送（含图标）；`status` 每秒发送，只含有变化的员工。
 - `launchedAt` 为 app 启动时间（Unix 秒，未运行时为 `null`），已运行时长由 JS 自行计算，避免每秒都算"有变化"。
-- `rooms`：`[{ "name": "大办公室", "kind": "offices" }, { "name": "生活部", "kind": "shared" }, …]`，第 0 个总是大办公室那排。
+- `rooms`：`[{ "name": "offices", "kind": "offices" }, { "name": "生活部", "kind": "shared" }, …]`，第 0 个总是大办公室那排（名字不显示）。
 - `kind`：`"staff"` 或 `"temp"`。`room`：正式员工的房间（`rooms` 的下标）；`seat`：在房间里的座位序号（大办公室里是第几间）。临时工两个都是 `null`，由 JS 分配隔间。
 
 ```json
 { "type": "paused", "paused": true }
+
+{ "type": "locale", "lang": "en" }
 ```
 
 - `paused`：窗口被完全遮挡、隐藏或锁屏时 Swift 发 `true`，网页停止渲染；恢复时发 `false`。
+- `locale`：界面语言 `zh` / `en`（2026-10-27 加）。默认跟随系统首选语言，菜单「语言 / Language」可手动切；ready 后最先发，切换时再发，网页重盖牌子、名片跟着换。
 
 JS → Swift（`webkit.messageHandlers.office.postMessage`）：
 

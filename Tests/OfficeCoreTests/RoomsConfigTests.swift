@@ -2,6 +2,13 @@ import XCTest
 @testable import OfficeCore
 
 final class RoomsConfigTests: XCTestCase {
+    override func setUp() {
+        Lang.current = .zh
+    }
+
+    override func tearDown() {
+        Lang.current = .system()
+    }
     private func parse(_ text: String) throws -> RoomsConfig {
         try RoomsConfig.parse(Data(text.utf8))
     }
@@ -46,6 +53,19 @@ final class RoomsConfigTests: XCTestCase {
         XCTAssertTrue(message("{\"offices\": \"Safari\"}").hasPrefix("offices 要是一串"))
         XCTAssertEqual(message("{\"rooms\": [{\"apps\": []}]}"), "rooms 里第 1 个缺 name（房间名字）")
         XCTAssertEqual(message("{\"rooms\": [{\"name\": \"A\", \"dock\": \"yes\"}]}"), "「A」的 dock 只能写 true 或 false")
+    }
+
+    func testExplainsMistakesInEnglishToo() {
+        Lang.current = .en
+        XCTAssertEqual(message("{\n  \"offices\": [\"A\" \"B\"]\n}"), "line 2 looks malformed (quotes, commas or brackets)")
+        XCTAssertEqual(message("{\"rooms\": [{\"apps\": []}]}"), "room 1 is missing a name")
+    }
+
+    func testFollowsTheFirstPreferredLanguage() {
+        XCTAssertEqual(Lang.system(preferred: ["zh-Hans-CN", "en"]), .zh)
+        XCTAssertEqual(Lang.system(preferred: ["en-US", "zh-Hans"]), .en)
+        XCTAssertEqual(Lang.system(preferred: ["ja-JP"]), .en)
+        XCTAssertEqual(Lang.system(preferred: []), .en)
     }
 
     func testDefaultComesFromTheDock() {
@@ -98,7 +118,12 @@ final class RoomsConfigTests: XCTestCase {
 final class RoomsFileTests: XCTestCase {
     private var dir: URL!
 
+    override func tearDown() {
+        Lang.current = .system()
+    }
+
     override func setUpWithError() throws {
+        Lang.current = .zh
         dir = FileManager.default.temporaryDirectory.appendingPathComponent("rooms-\(UUID().uuidString)")
     }
 

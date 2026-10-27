@@ -1,4 +1,5 @@
 import { hasNativeHost, installBridge } from './bridge';
+import { setLang, systemLang } from './i18n';
 import { NameCard } from './card';
 import { MockHost } from './mock';
 import { mockIcon } from './mockIcons';
@@ -10,6 +11,9 @@ import { OfficeApp } from './scene/officeApp';
 
 const container = document.getElementById('app')!;
 const params = new URLSearchParams(location.search);
+// Swift 外壳会马上发 locale 消息；在那之前（和 mock 模式）先按 ?lang= 或浏览器语言
+const langParam = params.get('lang');
+setLang(langParam === 'zh' || langParam === 'en' ? langParam : systemLang(navigator.languages));
 if (params.has('gallery')) runGallery(container);
 else if (params.has('layout')) runLayoutPreview(container, Number(params.get('layout')) || 5);
 else startOffice();
@@ -17,7 +21,8 @@ else startOffice();
 function startOffice(): void {
   const app = new OfficeApp(container);
   const bridge = installBridge(msg => app.handle(msg));
-  attachInteraction(app, action => bridge.post(action), new NameCard(container, app.model));
+  const hoverAt = attachInteraction(app, action => bridge.post(action), new NameCard(container, app.model));
+  bridge.onHover(hoverAt);
   // 不在 Swift 外壳里（或带 ?mock）就用假数据
   if (!hasNativeHost() || params.has('mock')) {
     const mock = new MockHost(msg => app.handle(msg), mockIcon);

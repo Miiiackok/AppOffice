@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { MockHost } from './mock';
 
 /** mock 模式左上角的调试按钮 */
@@ -11,15 +12,15 @@ export function mountMockPanel(parent: HTMLElement, mock: MockHost): void {
     panel.appendChild(b);
     return b;
   };
-  const net = add('断网', () => {
+  const net = add(t('断网', 'Go offline'), () => {
     const goOffline = mock.network === 'online';
     mock.setOffline(goOffline);
-    net.textContent = goOffline ? '联网' : '断网';
+    net.textContent = goOffline ? t('联网', 'Go online') : t('断网', 'Go offline');
   });
-  add('卡住一个', () => mock.hangRandom());
-  add('都恢复', () => mock.unhangAll());
-  add('去吃零食', () => mock.snackRandom());
-  add('来个临时工', () => mock.addTemp());
-  add('走个临时工', () => mock.removeTemp());
+  add(t('卡住一个', 'Freeze one'), () => mock.hangRandom());
+  add(t('都恢复', 'Unfreeze all'), () => mock.unhangAll());
+  add(t('去吃零食', 'Snack'), () => mock.snackRandom());
+  add(t('来个临时工', 'Add a temp'), () => mock.addTemp());
+  add(t('走个临时工', 'Remove a temp'), () => mock.removeTemp());
   parent.appendChild(panel);
 }

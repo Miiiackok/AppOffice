@@ -42,18 +42,19 @@ public struct RoomsConfig: Codable, Equatable, Sendable {
         } catch {
             let index = (error as NSError).userInfo["NSJSONSerializationErrorIndex"] as? Int
             let line = index.map { i in text.prefix(i).filter { $0 == "\n" }.count + 1 }
-            throw ParseError(description: line.map { "第 \($0) 行附近格式不对（引号、逗号或括号）" } ?? "格式不对（引号、逗号或括号）")
+            throw ParseError(description: line.map { L("第 \($0) 行附近格式不对（引号、逗号或括号）", "line \($0) looks malformed (quotes, commas or brackets)") }
+                ?? L("格式不对（引号、逗号或括号）", "it is malformed (quotes, commas or brackets)"))
         }
-        guard let root = json as? [String: Any] else { throw ParseError(description: "最外层要是 { … }") }
+        guard let root = json as? [String: Any] else { throw ParseError(description: L("最外层要是 { … }", "the top level must be { … }")) }
         let offices = try strings(root["offices"] ?? [], what: "offices")
-        guard let rawRooms = (root["rooms"] ?? []) as? [Any] else { throw ParseError(description: "rooms 要是 [ … ]") }
+        guard let rawRooms = (root["rooms"] ?? []) as? [Any] else { throw ParseError(description: L("rooms 要是 [ … ]", "rooms must be [ … ]")) }
         let rooms = try rawRooms.enumerated().map { i, raw -> SharedRoom in
-            guard let room = raw as? [String: Any] else { throw ParseError(description: "rooms 里第 \(i + 1) 个要是 { … }") }
+            guard let room = raw as? [String: Any] else { throw ParseError(description: L("rooms 里第 \(i + 1) 个要是 { … }", "room \(i + 1) must be { … }")) }
             guard let name = room["name"] as? String, !name.trimmingCharacters(in: .whitespaces).isEmpty else {
-                throw ParseError(description: "rooms 里第 \(i + 1) 个缺 name（房间名字）")
+                throw ParseError(description: L("rooms 里第 \(i + 1) 个缺 name（房间名字）", "room \(i + 1) is missing a name"))
             }
-            let apps = try strings(room["apps"] ?? [], what: "「\(name)」的 apps")
-            if let dock = room["dock"], !(dock is Bool) { throw ParseError(description: "「\(name)」的 dock 只能写 true 或 false") }
+            let apps = try strings(room["apps"] ?? [], what: L("「\(name)」的 apps", "the apps of \"\(name)\""))
+            if let dock = room["dock"], !(dock is Bool) { throw ParseError(description: L("「\(name)」的 dock 只能写 true 或 false", "dock in \"\(name)\" must be true or false")) }
             return SharedRoom(name: name, apps: apps, dock: room["dock"] as? Bool)
         }
         return RoomsConfig(offices: offices, rooms: rooms)
@@ -61,7 +62,8 @@ public struct RoomsConfig: Codable, Equatable, Sendable {
 
     private static func strings(_ value: Any, what: String) throws -> [String] {
         guard let list = value as? [Any], list.allSatisfy({ $0 is String }) else {
-            throw ParseError(description: "\(what) 要是一串用引号括起来的 app 名字，比如 [\"Safari\", \"Notes\"]")
+            throw ParseError(description: L("\(what) 要是一串用引号括起来的 app 名字，比如 [\"Safari\", \"Notes\"]",
+                                             "\(what) must be a list of quoted app names, like [\"Safari\", \"Notes\"]"))
         }
         return list.compactMap { ($0 as? String)?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
     }

@@ -51,7 +51,7 @@ public enum Roster {
         -> (rooms: [RoomInfo], roster: [RosterEntry]) {
         let dockByID = Dictionary(dock.map { ($0.bundleID, $0) }, uniquingKeysWith: { first, _ in first })
         let runningByID = Dictionary(running.map { ($0.bundleID, $0) }, uniquingKeysWith: { first, _ in first })
-        let info = [RoomInfo(name: "大办公室", kind: .offices)] + rooms.rooms.map { RoomInfo(name: $0.name, kind: .shared) }
+        let info = [RoomInfo(name: "offices", kind: .offices)] + rooms.rooms.map { RoomInfo(name: $0.name, kind: .shared) }
         var seen = Set<String>()
         var result: [RosterEntry] = []
         var seats = [Int](repeating: 0, count: info.count)

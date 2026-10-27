@@ -66,6 +66,8 @@ public enum OutboundMessage: Equatable, Sendable {
     case roster([RoomInfo], [RosterItem])
     case status(NetworkState, [EmployeeStatus])
     case paused(Bool)
+    /// 界面语言
+    case locale(Lang)
 
     public func json() -> String {
         let encoder = JSONEncoder()
@@ -78,6 +80,8 @@ public enum OutboundMessage: Equatable, Sendable {
             data = try! encoder.encode(StatusBody(type: "status", network: network, employees: employees))
         case .paused(let paused):
             data = try! encoder.encode(PausedBody(type: "paused", paused: paused))
+        case .locale(let lang):
+            data = try! encoder.encode(LocaleBody(type: "locale", lang: lang))
         }
         return String(decoding: data, as: UTF8.self)
     }
@@ -86,3 +90,4 @@ public enum OutboundMessage: Equatable, Sendable {
 private struct RosterBody: Encodable { let type: String; let rooms: [RoomInfo]; let employees: [RosterItem] }
 private struct StatusBody: Encodable { let type: String; let network: NetworkState; let employees: [EmployeeStatus] }
 private struct PausedBody: Encodable { let type: String; let paused: Bool }
+private struct LocaleBody: Encodable { let type: String; let lang: Lang }

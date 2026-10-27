@@ -17,7 +17,7 @@ memory hogs raid the pantry, and apps you haven't touched in a week slack off at
 
 [中文](README.md) · English
 
-<img src="docs/images/hero.jpg" alt="AppOffice overview: private offices, shared rooms, leisure area and cubicles" width="100%">
+<img src="docs/images/hero-en.jpg" alt="AppOffice overview: private offices, shared rooms, leisure area and cubicles" width="100%">
 
 </div>
 
@@ -25,7 +25,7 @@ memory hogs raid the pantry, and apps you haven't touched in a week slack off at
 
 ## ✨ At a glance
 
-<img src="docs/images/overview.gif" alt="Animated tour of the office" width="100%">
+<img src="docs/images/overview-en.gif" alt="Animated tour of the office" width="100%">
 
 AppOffice is a **menu bar app**. Every second it checks each app on your Mac — is it running, in front, how much CPU and memory, frozen, offline — and has that app's little employee act it out. A desk toy that doubles as a launcher.
 
@@ -43,21 +43,25 @@ AppOffice is a **menu bar app**. Every second it checks each app on your Mac —
 
 ## 📸 Highlights
 
+### Hover over anyone to see what they're up to: state, CPU, memory, uptime
+
+<img src="docs/images/hover-en.gif" alt="The pointer glides over several employees and their cards pop up" width="100%">
+
 ### Wi-Fi drops: everyone rushes to the gym; frozen apps queue for the restroom
 
-<img src="docs/images/offline.gif" alt="Apps run to the gym when offline; frozen apps go to the restroom" width="100%">
+<img src="docs/images/offline-en.gif" alt="Apps run to the gym when offline; frozen apps go to the restroom" width="100%">
 
 ### Long-forgotten apps hang out in the leisure area
 
-<img src="docs/images/leisure.gif" alt="Leisure area with arcade machines, bean bags and a TV" width="100%">
+<img src="docs/images/leisure-en.gif" alt="Leisure area with arcade machines, bean bags and a TV" width="100%">
 
 ### Drag an employee to the front door to quit the app
 
-<img src="docs/images/door.gif" alt="Picking up an employee and dropping them at the door quits the app" width="100%">
+<img src="docs/images/door-en.gif" alt="Picking up an employee and dropping them at the door quits the app" width="100%">
 
 ### Your favourite apps get glass-walled private offices
 
-<img src="docs/images/offices.jpg" alt="Private offices for Claude and ChatGPT above the shared rooms" width="100%">
+<img src="docs/images/offices-en.jpg" alt="Private offices for Claude and ChatGPT above the shared rooms" width="100%">
 
 ## 📦 Install
 
@@ -84,16 +88,19 @@ scripts/build-app.sh --install     # installs to ~/Applications
 
 | Do this | And… |
 |---|---|
-| Click an employee | See their card: state, CPU, memory, uptime |
+| Hover over an employee | Their card pops up: state, CPU, memory, uptime; it hides when you move away |
+| Click an employee | Pin the card until you click empty space |
 | Double-click an employee or their desk | Launch the app, or switch to it if it's running |
 | Drag an employee to the front door (bottom right) | Quit the app (like ⌘Q — unsaved documents still prompt) |
 | Drag empty space / scroll / double-click empty space | Rotate (±30°) / zoom / reset the view |
 
-**Menu bar 🏢**: Show office, Pin on top, Translucent mode (fades when the mouse is away), Edit room list…, Enable hang detection…, Debug → Simulate state, Quit. (Menus are in Chinese.)
+**Menu bar 🏢**: Show Office, Keep on Top, Translucent When Idle (fades when the mouse is away), Edit Room List…, 语言 / Language, Enable Hang Detection…, Debug → Simulate State, Quit.
+
+**Language**: the interface (signs, cards, menus, notifications) follows your system language — Chinese if your Mac is set to Chinese, English otherwise. Switch it any time under 语言 / Language in the menu.
 
 ## 🏠 Seat your apps: `rooms.json`
 
-Who sits where lives in `~/Library/Application Support/AppOffice/rooms.json`. Open it from the menu bar with **编辑房间名单…** (Edit room list…); save and the office rearranges **right away**.
+Who sits where lives in `~/Library/Application Support/AppOffice/rooms.json`. Open it from the menu bar with **Edit Room List…**; save and the office rearranges **right away**.
 
 ```json
 {
@@ -120,7 +127,7 @@ Who sits where lives in `~/Library/Application Support/AppOffice/rooms.json`. Op
 
 ## 🔐 Permissions
 
-- **Accessibility** (only needed for the restroom / hang detection): choose 开启卡顿检测… (Enable hang detection…) from the menu and switch AppOffice on in System Settings. Everything else works without it.
+- **Accessibility** (only needed for the restroom / hang detection): choose **Enable Hang Detection…** from the menu and switch AppOffice on in System Settings. Everything else works without it.
 - If you rebuild from source, macOS sees a new app and the old switch silently stops working: remove AppOffice (−) under System Settings → Privacy & Security → Accessibility and add it again.
 
 ## 💡 Tips

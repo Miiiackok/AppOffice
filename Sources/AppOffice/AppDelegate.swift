@@ -16,7 +16,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var screenLocked = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        defaults.register(defaults: ["showOffice": true, "pinOnTop": true, "translucent": false])
+        defaults.register(defaults: ["showOffice": true, "pinOnTop": true, "translucent": false, "language": "auto"])
+        applyLanguage()
         // swift run 时没有 bundle id，用不了通知中心
         if Bundle.main.bundleIdentifier != nil { UNUserNotificationCenter.current().delegate = self }
         panel = OfficePanel(content: makeContent())
@@ -24,7 +25,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         panel.onHoverChange = { [weak self] inside in
             self?.hovering = inside
             self?.applyTranslucency()
+            if !inside { self?.bridge?.hover(atWindowPoint: nil) }
         }
+        panel.onMouseMove = { [weak self] point in self?.bridge?.hover(atWindowPoint: point) }
         observeVisibility()
         menuBar = makeMenuBar()
 
@@ -67,11 +70,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             container.addSubview(bridge.webView)
             bridge.onAction = { [weak self] action in self?.handle(action) }
             bridge.onCrash = { [weak self] in self?.feed.reset() }
-            bridge.onGiveUp = { [weak self] in self?.showNotice("网页反复崩溃，已停止重新加载") }
-            bridge.onLoadFailed = { [weak self] message in self?.showNotice("网页没加载出来：\(message)") }
+            bridge.onGiveUp = { [weak self] in self?.showNotice(L("网页反复崩溃，已停止重新加载", "The office page keeps crashing, stopped reloading it")) }
+            bridge.onLoadFailed = { [weak self] message in self?.showNotice(L("网页没加载出来：\(message)", "The office page didn't load: \(message)")) }
             self.bridge = bridge
         } else {
-            showNotice("找不到网页资源：先在 web/ 里运行 npm run build")
+            showNotice(L("找不到网页资源：先在 web/ 里运行 npm run build", "Web assets not found: run npm run build in web/ first"))
         }
         container.addSubview(notice)
         container.postsFrameChangedNotifications = true
@@ -96,7 +99,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func handle(_ action: OfficeAction) {
         if action == .ready {
             notice.isHidden = true
-            bridge?.send(feed.ready())
+            // 先告诉网页用什么语言，再发名单
+            bridge?.send([.locale(Lang.current)] + feed.ready())
             updatePaused()
             return
         }
@@ -116,7 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         switch (action, operation) {
         case (.launch(let id), .none), (.activate(let id), .none):
             let name = roster.first(where: { $0.id == id })?.name ?? id
-            notify("找不到这个 app：\(name)")
+            notify(L("找不到这个 app：\(name)", "Can't find this app: \(name)"))
         default:
             AppControl.perform(operation, bundleID: appID) { [weak self] message in self?.notify(message) }
         }
@@ -203,14 +207,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func makeMenuBar() -> MenuBarController {
         MenuBarController(
             toggles: [
-                .init(title: "显示办公室", get: { [weak self] in self?.showOffice ?? false },
+                .init(title: { L("显示办公室", "Show Office") }, get: { [weak self] in self?.showOffice ?? false },
                       set: { [weak self] in self?.showOffice = $0 }),
-                .init(title: "钉在最上层", get: { [weak self] in self?.panel.pinned ?? false },
+                .init(title: { L("钉在最上层", "Keep on Top") }, get: { [weak self] in self?.panel.pinned ?? false },
                       set: { [weak self] in
                           self?.defaults.set($0, forKey: "pinOnTop")
                           self?.panel.pinned = $0
                       }),
-                .init(title: "透明模式", get: { [weak self] in self?.defaults.bool(forKey: "translucent") ?? false },
+                .init(title: { L("透明模式", "Translucent When Idle") }, get: { [weak self] in self?.defaults.bool(forKey: "translucent") ?? false },
                       set: { [weak self] in
                           self?.defaults.set($0, forKey: "translucent")
                           self?.applyTranslucency()
@@ -224,14 +228,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 guard let self else { return }
                 self.bridge?.send(self.feed.simulate(id, state))
             },
-            editRooms: { [weak self] in self?.editRooms() })
+            editRooms: { [weak self] in self?.editRooms() },
+            language: { [weak self] in self?.defaults.string(forKey: "language") ?? "auto" },
+            setLanguage: { [weak self] in self?.setLanguage($0) })
+    }
+
+    /// "auto" 跟随系统，"zh"、"en" 固定；网页跟着换牌子和名片
+    private func setLanguage(_ value: String) {
+        defaults.set(value, forKey: "language")
+        applyLanguage()
+        bridge?.send([.locale(Lang.current)])
+    }
+
+    private func applyLanguage() {
+        Lang.current = Lang(rawValue: defaults.string(forKey: "language") ?? "") ?? .system()
     }
 
     /// 用文本编辑器打开 rooms.json；保存后下一拍就重新排座
     private func editRooms() {
         let url = loop.roomsFile.url
         guard FileManager.default.fileExists(atPath: url.path) else {
-            notify("房间名单还没生成，过一秒再试")
+            notify(L("房间名单还没生成，过一秒再试", "The room list isn't ready yet, try again in a second"))
             return
         }
         // .json 没有默认程序时用文本编辑打开

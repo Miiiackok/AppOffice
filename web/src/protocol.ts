@@ -35,7 +35,8 @@ export interface EmployeeStatus {
 export type InboundMessage =
   | { type: 'roster'; rooms: RoomInfo[]; employees: RosterEmployee[] }
   | { type: 'status'; network: NetworkState; employees: EmployeeStatus[] }
-  | { type: 'paused'; paused: boolean };
+  | { type: 'paused'; paused: boolean }
+  | { type: 'locale'; lang: 'zh' | 'en' };
 
 export type OutboundAction =
   | { action: 'activate' | 'launch' | 'quit'; id: string }

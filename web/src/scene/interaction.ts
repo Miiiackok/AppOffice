@@ -10,7 +10,9 @@ const DRAG_THRESHOLD = 5;
 const DOOR_RADIUS = 1.4;
 const ROTATE_SPEED = 0.005;
 
-export function attachInteraction(app: OfficeApp, post: (action: OutboundAction) => void, card: NameCard): void {
+/** 返回一个函数，给 Swift 外壳转发的鼠标位置用（窗口坐标，null 是移出窗口） */
+export function attachInteraction(app: OfficeApp, post: (action: OutboundAction) => void, card: NameCard):
+  (x: number | null, y: number | null) => void {
   const el = app.renderer.domElement;
   const ray = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
@@ -50,8 +52,17 @@ export function attachInteraction(app: OfficeApp, post: (action: OutboundAction)
     el.setPointerCapture(e.pointerId);
   });
 
+  /** 鼠标没按着时停在谁身上就弹谁的名片 */
+  const hoverAt = (clientX: number | null, clientY: number | null) => {
+    if (down) return;
+    if (clientX === null || clientY === null) return card.hover(null, 0, 0);
+    aim({ clientX, clientY } as MouseEvent);
+    card.hover(pickAgent(), clientX, clientY);
+  };
+
+  el.addEventListener('pointerleave', () => hoverAt(null, null));
   el.addEventListener('pointermove', e => {
-    if (!down) return;
+    if (!down) return hoverAt(e.clientX, e.clientY);
     if (mode === 'none' && Math.hypot(e.clientX - down.x, e.clientY - down.y) > DRAG_THRESHOLD) {
       mode = down.agentId ? 'drag' : 'rotate';
       card.hide();
@@ -105,4 +116,6 @@ export function attachInteraction(app: OfficeApp, post: (action: OutboundAction)
   window.addEventListener('keydown', e => {
     if (e.key === 'Escape') card.hide();
   });
+
+  return hoverAt;
 }

@@ -3,6 +3,8 @@ import AppKit
 /// 浮动小窗：不抢焦点（点它不会改变"前台 app"），可拖动、改大小，位置大小自动记住
 final class OfficePanel: NSPanel {
     var onHoverChange: ((Bool) -> Void)?
+    /// 鼠标在窗口里移动（窗口坐标）；网页在窗口不是 key window 时收不到 mousemove，靠这个转过去
+    var onMouseMove: ((NSPoint) -> Void)?
 
     init(content: NSView) {
         super.init(contentRect: NSRect(x: 0, y: 0, width: 360, height: 260),
@@ -16,6 +18,8 @@ final class OfficePanel: NSPanel {
         minSize = NSSize(width: 240, height: 180)
         let host = HoverView()
         host.onHover = { [weak self] inside in self?.onHoverChange?(inside) }
+        host.onMove = { [weak self] point in self?.onMouseMove?(point) }
+        acceptsMouseMovedEvents = true
         contentView = host
         content.frame = host.bounds
         content.autoresizingMask = [.width, .height]
@@ -36,17 +40,19 @@ final class OfficePanel: NSPanel {
     }
 }
 
-/// 鼠标进出窗口内容时回调（透明模式用）
+/// 鼠标进出窗口内容时回调（透明模式用），移动时也报位置（名片用）
 final class HoverView: NSView {
     var onHover: ((Bool) -> Void)?
+    var onMove: ((NSPoint) -> Void)?
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         trackingAreas.forEach(removeTrackingArea)
-        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
                                        owner: self))
     }
 
     override func mouseEntered(with event: NSEvent) { onHover?(true) }
     override func mouseExited(with event: NSEvent) { onHover?(false) }
+    override func mouseMoved(with event: NSEvent) { onMove?(event.locationInWindow) }
 }

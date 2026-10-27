@@ -46,7 +46,7 @@ final class RosterTests: XCTestCase {
             AppProcess(bundleID: "com.example.Temp", name: "Temp", pid: 12),
         ]
         let (info, roster) = Roster.merge(rooms: rooms, dock: dock, running: running)
-        XCTAssertEqual(info, [RoomInfo(name: "大办公室", kind: .offices), RoomInfo(name: "生活部", kind: .shared),
+        XCTAssertEqual(info, [RoomInfo(name: "offices", kind: .offices), RoomInfo(name: "生活部", kind: .shared),
                               RoomInfo(name: "Dock 部", kind: .shared)])
         XCTAssertEqual(roster.map(\.id), ["com.google.Chrome", "com.tencent.xinWeChat", "com.apple.Notes", "com.apple.mail",
                                           "com.apple.finder", "com.apple.Safari", "com.example.Temp"])

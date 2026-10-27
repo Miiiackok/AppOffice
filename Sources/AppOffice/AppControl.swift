@@ -48,6 +48,6 @@ enum AppControl {
 
     private static func report(_ url: URL, _ error: Error, _ onLaunchFailed: @escaping (String) -> Void) {
         let name = url.deletingPathExtension().lastPathComponent
-        DispatchQueue.main.async { onLaunchFailed("\(name) 没能打开：\(error.localizedDescription)") }
+        DispatchQueue.main.async { onLaunchFailed(L("\(name) 没能打开：\(error.localizedDescription)", "Couldn't open \(name): \(error.localizedDescription)")) }
     }
 }

@@ -41,7 +41,7 @@ final class OfficeMonitorTests: XCTestCase {
             AppProcess(bundleID: "com.example.Temp", name: "Temp", pid: 12),
         ]
         let snap = monitor.tick(dock: dock, rooms: dockRoom, running: running)
-        XCTAssertEqual(snap.rooms.map(\.name), ["大办公室", "Dock"])
+        XCTAssertEqual(snap.rooms.map(\.name), ["offices", "Dock"])
         XCTAssertEqual(snap.roster.map(\.id), ["com.apple.finder", "com.apple.Safari", "com.apple.Notes", "com.example.Temp"])
         // Safari 没开，也查不到用过：去休闲区
         XCTAssertEqual(snap.statuses.map(\.state), [.focused, .resting, .snacking, .hung])

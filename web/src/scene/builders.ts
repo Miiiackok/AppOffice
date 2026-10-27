@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CELL, CUBICLE, type Cubicle, type Desk, type Layout, type Office, type Room } from '../layout';
+import { t } from '../i18n';
 import { PALETTE as P } from './palette';
 import { box, cellCenter, flat, rectCenter } from './util';
 
@@ -110,7 +111,8 @@ export function buildOffice(L: Layout): OfficeStatic {
   buildPantry(g, L);
   buildLeisure(g, L);
   // 设施牌子挂在后墙顶上
-  const facilities = [[L.zones.toilet, '洗手间'], [L.zones.gym, '健身房'], [L.zones.pantry, '茶水间'], [L.zones.leisure, '休闲区']] as const;
+  const facilities = [[L.zones.toilet, t('洗手间', 'Restroom')], [L.zones.gym, t('健身房', 'Gym')],
+    [L.zones.pantry, t('茶水间', 'Pantry')], [L.zones.leisure, t('休闲区', 'Lounge')]] as const;
   for (const [zone, text] of facilities) sign(text, rectCenter(zone)[0], 1.55, 0.08);
   const bounds = new THREE.Box3(new THREE.Vector3(-0.3, 0, -0.3), new THREE.Vector3(W + 0.3, 1.6, D + 0.3));
   return {

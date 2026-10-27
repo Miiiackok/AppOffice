@@ -52,4 +52,15 @@ describe('bridge', () => {
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
   });
+
+  it('passes forwarded mouse positions to the hover handler', () => {
+    const w: OfficeWindow = {};
+    const bridge = installBridge(() => {}, w);
+    const seen: (number | null)[][] = [];
+    w.office!.hover!(1, 2);
+    bridge.onHover((x, y) => seen.push([x, y]));
+    w.office!.hover!(10, 20);
+    w.office!.hover!(null, null);
+    expect(seen).toEqual([[10, 20], [null, null]]);
+  });
 });

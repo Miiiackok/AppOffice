@@ -1,10 +1,13 @@
-import { formatUptime, STATE_LABELS } from './labels';
+import { t } from './i18n';
+import { formatUptime, stateLabel } from './labels';
 import { isClosed, type OfficeModel } from './office';
 
-/** 点小人弹出的名片，每秒刷新一次 */
+/** 小人的名片：鼠标移上去弹出、移开收起；单击会钉住，点空白处才收。每秒刷新一次 */
 export class NameCard {
   private readonly el = document.createElement('div');
   private id: string | null = null;
+  /** 单击打开的，鼠标移开也不收 */
+  private pinned = false;
 
   constructor(private readonly parent: HTMLElement, private readonly model: OfficeModel) {
     this.el.className = 'card';
@@ -13,7 +16,15 @@ export class NameCard {
     setInterval(() => this.render(), 1000);
   }
 
-  show(id: string, clientX: number, clientY: number): void {
+  /** 鼠标停在小人上；已经钉住别人的名片时不抢 */
+  hover(id: string | null, clientX: number, clientY: number): void {
+    if (this.pinned) return;
+    if (id) this.show(id, clientX, clientY, false);
+    else this.hide();
+  }
+
+  show(id: string, clientX: number, clientY: number, pin = true): void {
+    this.pinned = pin;
     this.id = id;
     this.render();
     this.el.hidden = false;
@@ -25,6 +36,7 @@ export class NameCard {
 
   hide(): void {
     this.id = null;
+    this.pinned = false;
     this.el.hidden = true;
   }
 
@@ -37,11 +49,12 @@ export class NameCard {
     }
     const { info, status } = e;
     this.el.replaceChildren(
-      row('card-head', icon(info.iconPNG), text('strong', info.name), text('span', info.kind === 'staff' ? '正式员工' : '临时工', 'card-kind')),
-      text('div', STATE_LABELS[status.state], 'card-state'),
-      text('div', `CPU ${status.cpu}%　内存 ${status.memMB} MB`),
-      text('div', `已运行 ${formatUptime(status.launchedAt, Date.now() / 1000)}`),
-      text('div', isClosed(status.state) ? '双击叫他上班' : '双击切过去 · 拖到门口下班', 'card-hint'),
+      row('card-head', icon(info.iconPNG), text('strong', info.name), text('span', info.kind === 'staff' ? t('正式员工', 'Staff') : t('临时工', 'Temp'), 'card-kind')),
+      text('div', stateLabel(status.state), 'card-state'),
+      text('div', t(`CPU ${status.cpu}%　内存 ${status.memMB} MB`, `CPU ${status.cpu}% · Memory ${status.memMB} MB`)),
+      text('div', t('已运行 ', 'Up ') + formatUptime(status.launchedAt, Date.now() / 1000)),
+      text('div', isClosed(status.state) ? t('双击叫他上班', 'Double-click to launch')
+        : t('双击切过去 · 拖到门口下班', 'Double-click to switch · drag to the door to quit'), 'card-hint'),
     );
   }
 }

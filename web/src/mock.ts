@@ -1,6 +1,7 @@
 import type {
   EmployeeKind, EmployeeState, EmployeeStatus, InboundMessage, NetworkState, OutboundAction, RoomInfo, RosterEmployee,
 } from './protocol';
+import { t } from './i18n';
 import { isClosed } from './office';
 
 /** 根据名字和颜色画一个图标，返回 PNG base64 */
@@ -8,10 +9,10 @@ export type IconMaker = (name: string, color: string) => string;
 type AppDef = readonly [id: string, name: string, color: string];
 
 const FINDER = 'com.apple.finder';
-/** 和 rooms.json 一样分房间（大办公室一排 + 三间小办公室），换成假 app */
-const ROOMS: RoomInfo[] = [
-  { name: '大办公室', kind: 'offices' }, { name: '生活部', kind: 'shared' },
-  { name: '办公部', kind: 'shared' }, { name: 'Dock 部', kind: 'shared' },
+/** 和 rooms.json 一样分房间（大办公室一排 + 三间小办公室），换成假 app；房间名跟着语言 */
+const rooms = (): RoomInfo[] => [
+  { name: 'offices', kind: 'offices' }, { name: t('生活部', 'Daily'), kind: 'shared' },
+  { name: t('办公部', 'Work'), kind: 'shared' }, { name: t('Dock 部', 'Dock'), kind: 'shared' },
 ];
 const STAFF: AppDef[][] = [
   [
@@ -271,7 +272,7 @@ export class MockHost {
   }
 
   private sendRoster(): void {
-    this.send({ type: 'roster', rooms: ROOMS, employees: this.roster.map(e => ({ ...e })) });
+    this.send({ type: 'roster', rooms: rooms(), employees: this.roster.map(e => ({ ...e })) });
   }
 
   private sendStatus(ids: string[] = [...this.status.keys()]): void {

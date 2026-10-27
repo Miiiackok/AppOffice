@@ -10,9 +10,10 @@ let workspace = WorkspaceAppsSource()
 let worker = DispatchQueue(label: "officectl.tick")
 
 let labels: [EmployeeState: String] = [
-    .hung: "🚽 上厕所（卡住）", .offline: "🏋️ 健身（断网）", .launching: "🎒 刚到公司",
-    .focused: "⌨️ 疯狂干活", .snacking: "🍪 吃零食", .working: "💻 干活",
-    .idle: "☕ 半摸鱼", .resting: "🎮 休闲区", .off: "😴 摸鱼",
+    .hung: L("🚽 上厕所（卡住）", "🚽 restroom (frozen)"), .offline: L("🏋️ 健身（断网）", "🏋️ gym (offline)"),
+    .launching: L("🎒 刚到公司", "🎒 arriving"), .focused: L("⌨️ 疯狂干活", "⌨️ typing like mad"),
+    .snacking: L("🍪 吃零食", "🍪 snacking"), .working: L("💻 干活", "💻 working"),
+    .idle: L("☕ 半摸鱼", "☕ idle"), .resting: L("🎮 休闲区", "🎮 lounge"), .off: L("😴 摸鱼", "😴 slacking"),
 ]
 
 // 以下只在主线程读写
@@ -25,11 +26,16 @@ var busy = false
 
 func render(_ snap: OfficeSnapshot, trafficReady: Bool) {
     var out = "\u{1B}[2J\u{1B}[H"
-    out += "网络: \(snap.network.rawValue)    卡顿检测: \(snap.hangDetectionAvailable ? "开" : "关（终端需要辅助功能权限）")"
-    out += "    流量数据: \(trafficReady ? "已就绪" : "未就绪（nettop 首次运行约 5 秒）")\n\n"
+    let hang = snap.hangDetectionAvailable ? L("开", "on") : L("关（终端需要辅助功能权限）", "off (Terminal needs Accessibility)")
+    let traffic = trafficReady ? L("已就绪", "ready") : L("未就绪（nettop 首次运行约 5 秒）", "not ready (first nettop run takes ~5 s)")
+    out += L("网络: ", "network: ") + snap.network.rawValue + L("    卡顿检测: ", "    hang detection: ") + hang
+    out += L("    流量数据: ", "    traffic: ") + traffic + "\n\n"
     for (entry, status) in zip(snap.roster, snap.statuses) {
-        let room = entry.room.flatMap { snap.rooms.indices.contains($0) ? snap.rooms[$0].name : nil } ?? ""
-        let kind = entry.kind == .staff ? "\(room) #\(entry.seat ?? 0)" : "临时"
+        let room = entry.room.flatMap { i -> String? in
+            guard snap.rooms.indices.contains(i) else { return nil }
+            return snap.rooms[i].kind == .offices ? L("大办公室", "Offices") : snap.rooms[i].name
+        } ?? ""
+        let kind = entry.kind == .staff ? "\(room) #\(entry.seat ?? 0)" : L("临时", "temp")
         out += "\(kind)\t\(labels[status.state] ?? "")\tCPU \(status.cpu)%\t\(status.memMB) MB\t\(entry.name)\n"
     }
     print(out, terminator: "")

@@ -76,6 +76,18 @@ final class WebBridge: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         }
     }
 
+    /// 转发鼠标位置（窗口坐标）给网页弹名片；nil 是移出了窗口
+    func hover(atWindowPoint point: NSPoint?) {
+        guard let point else {
+            webView.evaluateJavaScript("window.office?.hover?.(null, null)")
+            return
+        }
+        let p = webView.convert(point, from: nil)
+        // 网页坐标原点在左上角
+        let y = webView.isFlipped ? p.y : webView.bounds.height - p.y
+        webView.evaluateJavaScript("window.office?.hover?.(\(Double(p.x)), \(Double(y)))")
+    }
+
     /// 日志里只打摘要：roster 带图标很长
     private static func summary(_ message: OutboundMessage, bytes: Int) -> String {
         switch message {
@@ -86,6 +98,8 @@ final class WebBridge: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
             return "status \(network.rawValue) [\(states)]"
         case .paused(let paused):
             return "paused \(paused)"
+        case .locale(let lang):
+            return "locale \(lang.rawValue)"
         }
     }
 

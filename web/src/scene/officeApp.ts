@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { getLang, setLang } from '../i18n';
 import { CELL } from '../layout';
 import { isClosed, OfficeModel } from '../office';
 import type { InboundMessage, RoomInfo, RosterEmployee } from '../protocol';
@@ -42,6 +43,15 @@ export class OfficeApp {
         return;
       case 'paused':
         this.paused = msg.paused;
+        return;
+      case 'locale':
+        // 牌子上的字是画在贴图里的，换语言要重盖一遍
+        if (msg.lang === getLang()) return;
+        setLang(msg.lang);
+        if (this.office) {
+          this.rebuildOffice();
+          this.refreshDecor();
+        }
         return;
     }
   }

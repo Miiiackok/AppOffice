@@ -43,6 +43,10 @@ final class MessagesTests: XCTestCase {
         XCTAssertEqual(e["seat"] as? Int, 2)
     }
 
+    func testLocaleJSON() {
+        XCTAssertEqual(OutboundMessage.locale(.en).json(), #"{"lang":"en","type":"locale"}"#)
+    }
+
     func testStatusAndPausedJSON() {
         let status = OutboundMessage.status(.offline, [EmployeeStatus(id: "a", state: .hung, cpu: 3, memMB: 10, launchedAt: nil)])
         XCTAssertEqual(status.json(),
