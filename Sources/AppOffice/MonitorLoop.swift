@@ -4,6 +4,9 @@ import OfficeCore
 /// 每秒一拍（暂停时 20 秒）：主线程收集运行列表和 Dock，后台串行队列算状态，回主线程交给 onSnapshot
 final class MonitorLoop {
     var onSnapshot: ((OfficeSnapshot) -> Void)?
+    /// rooms.json 写坏了、写不进去
+    var onRoomsProblem: ((String) -> Void)?
+    let roomsFile = RoomsFile()
     /// 最近一拍的运行列表（执行网页操作时用）
     private(set) var running: [AppProcess] = []
     private let network = NetworkWatcher()
@@ -11,7 +14,10 @@ final class MonitorLoop {
     private let workspace = WorkspaceAppsSource()
     private let worker = DispatchQueue(label: "AppOffice.tick")
     private var dock: [DockApp] = []
-    private var installed: [DockApp] = []
+    /// 只在 worker 上用
+    private let installed = InstalledApps()
+    private var rooms: ResolvedRooms = .empty
+    private var roomsDirty = true
     private var ticks = 0
     private var busy = false
     private var timer: Timer?
@@ -47,19 +53,30 @@ final class MonitorLoop {
         guard !busy else { return }
         // Dock 还没读到时每拍都重试
         if dock.isEmpty || ticks % 10 == 0 { dock = DockReader.keepLastIfEmpty(DockReader.load(), previous: dock) }
-        // 名单上的 app 装了没有：和 Dock 一样 10 秒查一次
-        if ticks % 10 == 0 { installed = InstalledApps.find(Roster.listedIDs) }
+        // rooms.json 每拍看一眼，改了马上重排；名字对 app 和 Dock 一样 10 秒一次（装了新 app 也能对上）
+        switch roomsFile.refresh(dock: dock) {
+        case .created, .loaded: roomsDirty = true
+        case .failed(let message): onRoomsProblem?(message)
+        case .unchanged: break
+        }
+        let config = roomsDirty || ticks % 10 == 0 ? roomsFile.config : nil
+        roomsDirty = false
         ticks += 1
         busy = true
         let currentDock = dock
-        let currentInstalled = installed
         let currentRunning = workspace.runningApps()
         running = currentRunning
         let paused = self.paused
         worker.async { [weak self] in
             guard let self else { return }
             if !paused { self.network.refreshTraffic() }
-            let snapshot = self.monitor.tick(dock: currentDock, installed: currentInstalled, running: currentRunning,
+            if let config {
+                let candidates = currentDock.map { AppCandidate(bundleID: $0.bundleID, names: [$0.name], url: $0.url) }
+                    + currentRunning.map { AppCandidate(bundleID: $0.bundleID, names: [$0.name], url: $0.bundleURL) }
+                    + self.installed.candidates()
+                self.rooms = RoomsResolver.resolve(config, candidates: candidates)
+            }
+            let snapshot = self.monitor.tick(dock: currentDock, rooms: self.rooms, running: currentRunning,
                                              detectHangs: !paused)
             DispatchQueue.main.async {
                 self.busy = false

@@ -29,114 +29,66 @@ final class RosterTests: XCTestCase {
         XCTAssertEqual(url?.isFileURL, true)
     }
 
-    func testMergeSeatsListedAppsByRoomThenTemps() {
-        let dock = [
-            DockApp(bundleID: "com.apple.Safari", name: "Safari", url: nil),
-            DockApp(bundleID: "com.apple.Notes", name: "Notes", url: nil),
-        ]
+    private func app(_ id: String, _ name: String, _ url: String? = nil) -> DockApp {
+        DockApp(bundleID: id, name: name, url: url.map { URL(fileURLWithPath: $0) })
+    }
+
+    func testMergeSeatsOfficesThenRoomsThenTemps() {
+        let rooms = ResolvedRooms(
+            offices: [app("com.google.Chrome", "Google Chrome"), app("com.tencent.xinWeChat", "WeChat")],
+            rooms: [
+                .init(name: "生活部", apps: [app("com.apple.Notes", "Notes"), app("com.apple.mail", "Mail")], collectsDock: false),
+                .init(name: "Dock 部", apps: [app("com.apple.finder", "Finder")], collectsDock: true),
+            ])
+        let dock = [app("com.apple.Safari", "Safari"), app("com.apple.Notes", "备忘录")]
         let running = [
             AppProcess(bundleID: "com.apple.finder", name: "访达", pid: 10),
-            AppProcess(bundleID: "com.apple.Notes", name: "备忘录", pid: 11),
             AppProcess(bundleID: "com.example.Temp", name: "Temp", pid: 12),
         ]
-        let roster = Roster.merge(dock: dock, running: running)
-        XCTAssertEqual(roster.map(\.id), ["com.apple.Notes", "com.apple.finder", "com.apple.Safari", "com.example.Temp"])
-        XCTAssertEqual(roster.map(\.kind), [.staff, .staff, .staff, .temp])
-        XCTAssertEqual(roster.map(\.room), [.apple, .dock, .dock, nil])
-        XCTAssertEqual(roster.map(\.seat), [0, 0, 1, nil])
-        // 访达用运行中的本地化名字，Dock 里的员工用 Dock 上的名字
-        XCTAssertEqual(roster.map(\.name), ["Notes", "访达", "Safari", "Temp"])
+        let (info, roster) = Roster.merge(rooms: rooms, dock: dock, running: running)
+        XCTAssertEqual(info, [RoomInfo(name: "大办公室", kind: .offices), RoomInfo(name: "生活部", kind: .shared),
+                              RoomInfo(name: "Dock 部", kind: .shared)])
+        XCTAssertEqual(roster.map(\.id), ["com.google.Chrome", "com.tencent.xinWeChat", "com.apple.Notes", "com.apple.mail",
+                                          "com.apple.finder", "com.apple.Safari", "com.example.Temp"])
+        XCTAssertEqual(roster.map(\.room), [0, 0, 1, 1, 2, 2, nil])
+        XCTAssertEqual(roster.map(\.seat), [0, 1, 0, 1, 0, 1, nil])
+        XCTAssertEqual(roster.map(\.kind), [.staff, .staff, .staff, .staff, .staff, .staff, .temp])
+        // Dock 上的名字优先，其次运行时的名字
+        XCTAssertEqual(roster.map(\.name), ["Google Chrome", "WeChat", "备忘录", "Mail", "访达", "Safari", "Temp"])
     }
 
-    func testListedAppsKeepTheirSeatWithoutDock() {
-        let chromeURL = URL(fileURLWithPath: "/Applications/Google Chrome.app")
-        let installed = [
-            DockApp(bundleID: "com.google.Chrome", name: "Google Chrome", url: chromeURL),
-            DockApp(bundleID: "com.tencent.xinWeChat", name: "WeChat", url: nil),
-            DockApp(bundleID: "com.apple.iWork.Pages", name: "Pages", url: nil),
-        ]
-        let running = [AppProcess(bundleID: "com.anthropic.claudefordesktop", name: "Claude", pid: 5)]
-        let roster = Roster.merge(dock: [], installed: installed, running: running)
-        // 没装的（ChatGPT）跳过，后面的往前坐
-        XCTAssertEqual(roster.map(\.id), ["com.google.Chrome", "com.anthropic.claudefordesktop", "com.tencent.xinWeChat",
-                                          "com.apple.iWork.Pages", "com.apple.finder"])
-        XCTAssertEqual(roster.map(\.room), [.office, .office, .office, .tools, .dock])
-        XCTAssertEqual(roster.map(\.seat), [0, 1, 2, 0, 0])
-        XCTAssertEqual(roster.map(\.kind), [.staff, .staff, .staff, .staff, .staff])
-        XCTAssertEqual(roster[0].bundleURL, chromeURL)
-        XCTAssertEqual(roster[0].name, "Google Chrome")
+    func testUnlistedDockAppsAreTempsWithoutACollectingRoom() {
+        let rooms = ResolvedRooms(offices: [], rooms: [.init(name: "A", apps: [], collectsDock: false)])
+        let dock = [app("com.apple.Safari", "Safari")]
+        let running = [AppProcess(bundleID: "com.apple.Safari", name: "Safari", pid: 1)]
+        let (_, roster) = Roster.merge(rooms: rooms, dock: dock, running: running)
+        XCTAssertEqual(roster.map(\.kind), [.temp])
+        // 没开就不出现
+        XCTAssertEqual(Roster.merge(rooms: rooms, dock: dock, running: []).roster, [])
     }
 
-    func testUnlistedDockAppsJoinTheDockRoom() {
-        let dock = [
-            DockApp(bundleID: "com.example.Pinned", name: "Pinned", url: nil),
-            DockApp(bundleID: "com.apple.Maps", name: "Maps", url: nil),
-            DockApp(bundleID: "com.apple.apps.launcher", name: "Apps", url: nil),
-        ]
-        let roster = Roster.merge(dock: dock, running: [])
-        XCTAssertEqual(roster.map(\.id), ["com.apple.finder", "com.apple.apps.launcher", "com.apple.Maps", "com.example.Pinned"])
-        XCTAssertEqual(roster.map(\.room), [.dock, .dock, .dock, .dock])
-        XCTAssertEqual(roster.map(\.seat), [0, 1, 2, 3])
+    func testAnAppListedTwiceSitsInTheFirstPlace() {
+        let notes = app("com.apple.Notes", "Notes")
+        let rooms = ResolvedRooms(offices: [notes], rooms: [.init(name: "A", apps: [notes], collectsDock: true)])
+        let (_, roster) = Roster.merge(rooms: rooms, dock: [notes], running: [])
+        XCTAssertEqual(roster.map(\.room), [0])
     }
 
-    func testRunningIDWinsASharedSlot() {
-        let installed = [
-            DockApp(bundleID: "com.openai.chat", name: "ChatGPT", url: nil),
-            DockApp(bundleID: "com.openai.codex", name: "ChatGPT", url: nil),
-        ]
-        let running = [AppProcess(bundleID: "com.openai.codex", name: "ChatGPT", pid: 7)]
-        let roster = Roster.merge(dock: [], installed: installed, running: running)
-        XCTAssertEqual(roster.first?.id, "com.openai.codex")
-        XCTAssertEqual(roster.first?.room, .office)
-        XCTAssertFalse(roster.contains { $0.id == "com.openai.chat" })
+    func testStaffURLPrefersDockThenRunningThenResolved() {
+        let rooms = ResolvedRooms(offices: [app("a", "A", "/Installed/A.app"), app("b", "B", "/Installed/B.app"),
+                                            app("c", "C", "/Installed/C.app")], rooms: [])
+        let dock = [app("a", "A", "/Dock/A.app")]
+        let running = [AppProcess(bundleID: "b", name: "B", pid: 1, bundleURL: URL(fileURLWithPath: "/Running/B.app"))]
+        let (_, roster) = Roster.merge(rooms: rooms, dock: dock, running: running)
+        XCTAssertEqual(roster.map { $0.bundleURL?.path }, ["/Dock/A.app", "/Running/B.app", "/Installed/C.app"])
     }
 
-    func testEveryListedIDIsUnique() {
-        XCTAssertEqual(Set(Roster.listedIDs).count, Roster.listedIDs.count)
-        XCTAssertEqual(Roster.rooms.first { $0.room == .office }?.slots.count, 4)
-        XCTAssertEqual(Roster.rooms.first { $0.room == .apple }?.slots.count, 12)
-        XCTAssertEqual(Roster.rooms.first { $0.room == .tools }?.slots.count, 7)
-    }
-
-    func testFinderNotDuplicatedWhenInDock() {
-        let dock = [DockApp(bundleID: "com.apple.finder", name: "Finder", url: nil)]
-        let roster = Roster.merge(dock: dock, running: [])
-        XCTAssertEqual(roster.map(\.id), ["com.apple.finder"])
-        XCTAssertEqual(roster[0].name, "Finder")
-    }
-
-    func testDuplicatesCollapse() {
-        let dock = [
-            DockApp(bundleID: "com.apple.Safari", name: "Safari", url: nil),
-            DockApp(bundleID: "com.apple.Safari", name: "Safari", url: nil),
-        ]
+    func testDuplicateRunningProcessesCollapse() {
         let running = [
             AppProcess(bundleID: "com.example.Temp", name: "Temp", pid: 1),
             AppProcess(bundleID: "com.example.Temp", name: "Temp", pid: 2),
         ]
-        XCTAssertEqual(Roster.merge(dock: dock, running: running).map(\.id),
-                       ["com.apple.finder", "com.apple.Safari", "com.example.Temp"])
-    }
-
-    func testFinderInDockAndRunningUsesDockLabel() {
-        let dock = [DockApp(bundleID: "com.apple.finder", name: "Finder", url: nil)]
-        let running = [AppProcess(bundleID: "com.apple.finder", name: "访达", pid: 10)]
-        let roster = Roster.merge(dock: dock, running: running)
-        XCTAssertEqual(roster.map(\.id), ["com.apple.finder"])
-        XCTAssertEqual(roster[0].name, "Finder")
-    }
-
-    func testStaffURLFallsBackToRunning() {
-        let safariURL = URL(string: "file:///Applications/Safari.app/")
-        let tempURL = URL(string: "file:///Applications/Temp.app/")
-        let dock = [DockApp(bundleID: "com.apple.Safari", name: "Safari", url: nil)]
-        let running = [
-            AppProcess(bundleID: "com.apple.Safari", name: "Safari", pid: 1, bundleURL: safariURL),
-            AppProcess(bundleID: "com.example.Temp", name: "Temp", pid: 2, bundleURL: tempURL),
-        ]
-        let roster = Roster.merge(dock: dock, running: running)
-        XCTAssertEqual(roster[1].bundleURL, safariURL)
-        XCTAssertEqual(roster[2].bundleURL, tempURL)
+        XCTAssertEqual(Roster.merge(rooms: .empty, dock: [], running: running).roster.map(\.id), ["com.example.Temp"])
     }
 
     func testKeepsLastDockWhenReadFails() {

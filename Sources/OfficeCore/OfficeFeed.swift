@@ -23,7 +23,7 @@ public struct OfficeFeed {
     private var isReady = false
     private var paused = false
     private var last: OfficeSnapshot?
-    private var sentRoster: [RosterItem]?
+    private var sentRoster: (rooms: [RoomInfo], items: [RosterItem])?
     private var sentNetwork: NetworkState?
     private var differ = StatusDiffer()
     private var overrides: [String: EmployeeState] = [:]
@@ -76,9 +76,9 @@ public struct OfficeFeed {
             let icon = icons.icon(for: e)
             return RosterItem(id: e.id, name: e.name, kind: e.kind, room: e.room, seat: e.seat, color: icon.color, iconPNG: icon.pngBase64)
         }
-        if roster != sentRoster {
-            out.append(.roster(roster))
-            sentRoster = roster
+        if roster != sentRoster?.items || snapshot.rooms != sentRoster?.rooms {
+            out.append(.roster(snapshot.rooms, roster))
+            sentRoster = (snapshot.rooms, roster)
         }
         let statuses = snapshot.statuses.map { s -> EmployeeStatus in
             var s = s

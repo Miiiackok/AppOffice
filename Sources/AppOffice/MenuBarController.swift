@@ -22,19 +22,22 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let employees: () -> [(id: String, name: String)]
     private let simulated: () -> [String: EmployeeState]
     private let simulate: (String, EmployeeState?) -> Void
+    private let editRooms: () -> Void
 
     init(toggles: [Toggle],
          hangDetectionAvailable: @escaping () -> Bool,
          enableHangDetection: @escaping () -> Void,
          employees: @escaping () -> [(id: String, name: String)],
          simulated: @escaping () -> [String: EmployeeState],
-         simulate: @escaping (String, EmployeeState?) -> Void) {
+         simulate: @escaping (String, EmployeeState?) -> Void,
+         editRooms: @escaping () -> Void) {
         self.toggles = toggles
         self.hangDetectionAvailable = hangDetectionAvailable
         self.enableHangDetection = enableHangDetection
         self.employees = employees
         self.simulated = simulated
         self.simulate = simulate
+        self.editRooms = editRooms
         super.init()
         let image = NSImage(systemSymbolName: "building.2", accessibilityDescription: "AppOffice")
         image?.isTemplate = true
@@ -54,6 +57,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             menu.addItem(entry)
         }
         menu.addItem(.separator())
+        let rooms = NSMenuItem(title: "编辑房间名单…", action: #selector(openRooms), keyEquivalent: "")
+        rooms.target = self
+        menu.addItem(rooms)
         if !hangDetectionAvailable() {
             let entry = NSMenuItem(title: "开启卡顿检测…", action: #selector(askForAccessibility), keyEquivalent: "")
             entry.target = self
@@ -109,6 +115,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func flip(_ sender: NSMenuItem) {
         let toggle = toggles[sender.tag]
         toggle.set(!toggle.get())
+    }
+
+    @objc private func openRooms() {
+        editRooms()
     }
 
     @objc private func askForAccessibility() {

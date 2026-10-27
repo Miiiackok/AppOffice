@@ -26,13 +26,17 @@ public struct WorkspaceAppsSource: RunningAppsSource {
 }
 
 public struct OfficeSnapshot: Equatable, Sendable {
+    /// 第 0 间是大办公室那排，之后是小办公室
+    public var rooms: [RoomInfo]
     public var roster: [RosterEntry]
     /// 与 roster 一一对应、顺序相同
     public var statuses: [EmployeeStatus]
     public var network: NetworkState
     public var hangDetectionAvailable: Bool
 
-    public init(roster: [RosterEntry], statuses: [EmployeeStatus], network: NetworkState, hangDetectionAvailable: Bool) {
+    public init(rooms: [RoomInfo] = [], roster: [RosterEntry], statuses: [EmployeeStatus], network: NetworkState,
+                hangDetectionAvailable: Bool) {
+        self.rooms = rooms
         self.roster = roster
         self.statuses = statuses
         self.network = network
@@ -76,10 +80,10 @@ public final class OfficeMonitor {
 
     /// 可能阻塞最多一个 AX 超时（0.5 秒），不要在主线程上调。
     /// detectHangs 为 false 时不 ping，谁都不算卡住，hangDetectionAvailable 沿用上一次的。
-    /// installed 是名单上装了的 app（见 InstalledApps），没在 Dock 里、没运行也有座位
-    public func tick(dock: [DockApp], installed: [DockApp] = [], running: [AppProcess],
+    /// rooms 是 rooms.json 对上 app 之后的名单（见 RoomsResolver）
+    public func tick(dock: [DockApp], rooms: ResolvedRooms = .empty, running: [AppProcess],
                      detectHangs: Bool = true) -> OfficeSnapshot {
-        let roster = Roster.merge(dock: dock, installed: installed, running: running)
+        let (roomInfo, roster) = Roster.merge(rooms: rooms, dock: dock, running: running)
         let byID = Dictionary(running.map { ($0.bundleID, $0) }, uniquingKeysWith: { first, _ in first })
         let pids = byID.values.map(\.pid)
         let metrics = sampler.sample(pids: pids)
@@ -106,7 +110,7 @@ public final class OfficeMonitor {
                 thresholds: thresholds)
             return StateResolver.status(for: entry, process: process, metrics: m, state: state)
         }
-        return OfficeSnapshot(roster: roster, statuses: statuses, network: online ? .online : .offline,
+        return OfficeSnapshot(rooms: roomInfo, roster: roster, statuses: statuses, network: online ? .online : .offline,
                               hangDetectionAvailable: hangDetector.isAvailable)
     }
 }

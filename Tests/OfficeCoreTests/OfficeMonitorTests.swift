@@ -13,6 +13,10 @@ private struct StaticPinger: AppPinger {
 
 final class OfficeMonitorTests: XCTestCase {
     private let gb: UInt64 = 1024 * 1024 * 1024
+    /// 一间收留 Dock app 的小办公室，访达坐第一个
+    private let dockRoom = ResolvedRooms(offices: [], rooms: [
+        .init(name: "Dock", apps: [DockApp(bundleID: "com.apple.finder", name: "Finder", url: nil)], collectsDock: true),
+    ])
 
     func testTickResolvesEveryEmployee() {
         let usage = StaticUsage()
@@ -36,12 +40,13 @@ final class OfficeMonitorTests: XCTestCase {
             AppProcess(bundleID: "com.apple.Notes", name: "Notes", pid: 11),
             AppProcess(bundleID: "com.example.Temp", name: "Temp", pid: 12),
         ]
-        let snap = monitor.tick(dock: dock, running: running)
-        XCTAssertEqual(snap.roster.map(\.id), ["com.apple.Notes", "com.apple.finder", "com.apple.Safari", "com.example.Temp"])
+        let snap = monitor.tick(dock: dock, rooms: dockRoom, running: running)
+        XCTAssertEqual(snap.rooms.map(\.name), ["大办公室", "Dock"])
+        XCTAssertEqual(snap.roster.map(\.id), ["com.apple.finder", "com.apple.Safari", "com.apple.Notes", "com.example.Temp"])
         // Safari 没开，也查不到用过：去休闲区
-        XCTAssertEqual(snap.statuses.map(\.state), [.snacking, .focused, .resting, .hung])
-        XCTAssertEqual(snap.statuses[1].memMB, 50)
-        XCTAssertEqual(snap.statuses[1].launchedAt, 1_791_900_000)
+        XCTAssertEqual(snap.statuses.map(\.state), [.focused, .resting, .snacking, .hung])
+        XCTAssertEqual(snap.statuses[0].memMB, 50)
+        XCTAssertEqual(snap.statuses[0].launchedAt, 1_791_900_000)
         XCTAssertEqual(snap.network, .online)
         XCTAssertTrue(snap.hangDetectionAvailable)
     }
@@ -134,16 +139,16 @@ final class OfficeMonitorTests: XCTestCase {
         ]
         let state = { (snap: OfficeSnapshot, id: String) in snap.statuses.first { $0.id == id }?.state }
         // 开着的 Old：AppOffice 记住刚见过它
-        let first = monitor.tick(dock: dock, running: [AppProcess(bundleID: "com.example.Old", name: "Old", pid: 10)])
+        let first = monitor.tick(dock: dock, rooms: dockRoom, running: [AppProcess(bundleID: "com.example.Old", name: "Old", pid: 10)])
         XCTAssertEqual(state(first, "com.example.Recent"), .off)
         XCTAssertEqual(state(first, "com.example.Never"), .resting)
         XCTAssertEqual(state(first, "com.example.Old"), .idle)
         // 关掉以后还在摸鱼，不去休闲区
-        let closed = monitor.tick(dock: dock, running: [])
+        let closed = monitor.tick(dock: dock, rooms: dockRoom, running: [])
         XCTAssertEqual(state(closed, "com.example.Old"), .off)
         // 8 天后才去
         today = now + 8 * day
-        XCTAssertEqual(state(monitor.tick(dock: dock, running: []), "com.example.Old"), .resting)
+        XCTAssertEqual(state(monitor.tick(dock: dock, rooms: dockRoom, running: []), "com.example.Old"), .resting)
     }
 
     func testIsAliveForOwnProcess() {

@@ -1,5 +1,5 @@
 import type {
-  EmployeeKind, EmployeeState, EmployeeStatus, InboundMessage, NetworkState, OutboundAction, RosterEmployee, RoomName,
+  EmployeeKind, EmployeeState, EmployeeStatus, InboundMessage, NetworkState, OutboundAction, RoomInfo, RosterEmployee,
 } from './protocol';
 import { isClosed } from './office';
 
@@ -8,15 +8,19 @@ export type IconMaker = (name: string, color: string) => string;
 type AppDef = readonly [id: string, name: string, color: string];
 
 const FINDER = 'com.apple.finder';
-/** 和 Swift 外壳的名单一样分房间，换成假 app */
-const STAFF: Record<RoomName, AppDef[]> = {
-  office: [
+/** 和 rooms.json 一样分房间（大办公室一排 + 三间小办公室），换成假 app */
+const ROOMS: RoomInfo[] = [
+  { name: '大办公室', kind: 'offices' }, { name: '生活部', kind: 'shared' },
+  { name: '办公部', kind: 'shared' }, { name: 'Dock 部', kind: 'shared' },
+];
+const STAFF: AppDef[][] = [
+  [
     ['mock.browser', '浏览器', '#2F80ED'],
     ['mock.claude', 'Claude', '#D97757'],
     ['mock.gpt', 'ChatGPT', '#10A37F'],
     ['mock.chat', '聊天', '#34C759'],
   ],
-  apple: [
+  [
     ['mock.phone', '电话', '#4CD964'],
     ['mock.calendar', '日历', '#E5534B'],
     ['mock.contacts', '通讯录', '#A2845E'],
@@ -30,7 +34,7 @@ const STAFF: Record<RoomName, AppDef[]> = {
     ['mock.mail', '邮件', '#4FA3E0'],
     ['mock.games', '游戏', '#9B51E0'],
   ],
-  tools: [
+  [
     ['mock.keynote', '演示', '#2F80ED'],
     ['mock.numbers', '表格', '#27AE60'],
     ['mock.pages', '文稿', '#F2A65A'],
@@ -39,13 +43,13 @@ const STAFF: Record<RoomName, AppDef[]> = {
     ['mock.siri', '助理', '#BF5AF2'],
     ['mock.settings', '设置', '#8E8E93'],
   ],
-  dock: [
+  [
     [FINDER, '访达', '#3D7BFD'],
     ['mock.launcher', '启动台', '#C7C7CC'],
     ['mock.safari', 'Safari', '#0A84FF'],
     ['mock.maps', '地图', '#6FCF97'],
   ],
-};
+];
 const TEMPS: AppDef[] = [
   ['mock.video', '视频剪辑', '#E76F51'],
   ['mock.editor', '编辑器', '#2A9D8F'],
@@ -77,9 +81,7 @@ export class MockHost {
     private readonly now: () => number = () => Date.now() / 1000,
     private readonly random: () => number = Math.random,
   ) {
-    for (const [room, apps] of Object.entries(STAFF) as [RoomName, AppDef[]][]) {
-      apps.forEach(([id, name, color], seat) => this.add(id, name, color, 'staff', room, seat));
-    }
+    STAFF.forEach((apps, room) => apps.forEach(([id, name, color], seat) => this.add(id, name, color, 'staff', room, seat)));
     for (let i = 0; i < INITIAL_TEMPS; i++) this.takeTemp();
     for (const id of INITIAL_RUNNING) this.setState(id, 'idle');
     for (const id of INITIAL_RESTING) this.setState(id, 'resting');
@@ -237,7 +239,7 @@ export class MockHost {
     this.sendStatus([id]);
   }
 
-  private add(id: string, name: string, color: string, kind: EmployeeKind, room: RoomName | null, seat: number | null): void {
+  private add(id: string, name: string, color: string, kind: EmployeeKind, room: number | null, seat: number | null): void {
     this.roster.push({ id, name, kind, room, seat, color, iconPNG: this.icon(name, color) });
     this.status.set(id, { id, state: 'off', cpu: 0, memMB: 0, launchedAt: null });
   }
@@ -269,7 +271,7 @@ export class MockHost {
   }
 
   private sendRoster(): void {
-    this.send({ type: 'roster', employees: this.roster.map(e => ({ ...e })) });
+    this.send({ type: 'roster', rooms: ROOMS, employees: this.roster.map(e => ({ ...e })) });
   }
 
   private sendStatus(ids: string[] = [...this.status.keys()]): void {

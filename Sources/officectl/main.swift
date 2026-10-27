@@ -17,7 +17,9 @@ let labels: [EmployeeState: String] = [
 
 // 以下只在主线程读写
 var dock: [DockApp] = []
-var installed: [DockApp] = []
+let roomsFile = RoomsFile()
+let installed = InstalledApps()
+var rooms: ResolvedRooms = .empty
 var ticks = 0
 var busy = false
 
@@ -26,7 +28,8 @@ func render(_ snap: OfficeSnapshot, trafficReady: Bool) {
     out += "网络: \(snap.network.rawValue)    卡顿检测: \(snap.hangDetectionAvailable ? "开" : "关（终端需要辅助功能权限）")"
     out += "    流量数据: \(trafficReady ? "已就绪" : "未就绪（nettop 首次运行约 5 秒）")\n\n"
     for (entry, status) in zip(snap.roster, snap.statuses) {
-        let kind = entry.kind == .staff ? "\(entry.room?.rawValue ?? "") #\(entry.seat ?? 0)" : "临时"
+        let room = entry.room.flatMap { snap.rooms.indices.contains($0) ? snap.rooms[$0].name : nil } ?? ""
+        let kind = entry.kind == .staff ? "\(room) #\(entry.seat ?? 0)" : "临时"
         out += "\(kind)\t\(labels[status.state] ?? "")\tCPU \(status.cpu)%\t\(status.memMB) MB\t\(entry.name)\n"
     }
     print(out, terminator: "")
@@ -37,17 +40,21 @@ func step() {
     // 上一拍还没算完就跳过，避免排队
     if busy { return }
     busy = true
-    if ticks % 10 == 0 {
-        dock = DockReader.load()
-        installed = InstalledApps.find(Roster.listedIDs)
-    }
+    if ticks % 10 == 0 { dock = DockReader.load() }
+    if case .failed(let message) = roomsFile.refresh(dock: dock) { print(message) }
+    let config = roomsFile.config
     ticks += 1
     let currentDock = dock
-    let currentInstalled = installed
     let running = workspace.runningApps()
     worker.async {
         network.refreshTraffic()
-        let snap = monitor.tick(dock: currentDock, installed: currentInstalled, running: running)
+        if let config {
+            let candidates = currentDock.map { AppCandidate(bundleID: $0.bundleID, names: [$0.name], url: $0.url) }
+                + running.map { AppCandidate(bundleID: $0.bundleID, names: [$0.name], url: $0.bundleURL) }
+                + installed.candidates()
+            rooms = RoomsResolver.resolve(config, candidates: candidates)
+        }
+        let snap = monitor.tick(dock: currentDock, rooms: rooms, running: running)
         let trafficReady = network.isNettopAvailable
         DispatchQueue.main.async {
             render(snap, trafficReady: trafficReady)

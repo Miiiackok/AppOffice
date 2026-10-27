@@ -2,17 +2,20 @@
 export type EmployeeState =
   | 'hung' | 'offline' | 'launching' | 'focused' | 'snacking' | 'working' | 'idle' | 'resting' | 'off';
 export type EmployeeKind = 'staff' | 'temp';
-/** 正式员工坐哪个房间：office 一人一间大办公室，其余是合用的小办公室 */
-export type RoomName = 'office' | 'apple' | 'tools' | 'dock';
+/** 房间（来自 rooms.json）：offices 是一排大办公室、每人一间；shared 是合用的小办公室，name 挂在门口 */
+export interface RoomInfo {
+  name: string;
+  kind: 'offices' | 'shared';
+}
 export type NetworkState = 'online' | 'offline';
 
 export interface RosterEmployee {
   id: string;
   name: string;
   kind: EmployeeKind;
-  /** 正式员工的房间；临时工为 null */
-  room: RoomName | null;
-  /** 正式员工在房间里的座位序号（office 里是第几间）；临时工为 null */
+  /** 正式员工的房间（roster 消息里 rooms 的下标）；临时工为 null */
+  room: number | null;
+  /** 正式员工在房间里的座位序号（大办公室里是第几间）；临时工为 null */
   seat: number | null;
   /** 图标主色 #RRGGBB */
   color: string;
@@ -30,7 +33,7 @@ export interface EmployeeStatus {
 }
 
 export type InboundMessage =
-  | { type: 'roster'; employees: RosterEmployee[] }
+  | { type: 'roster'; rooms: RoomInfo[]; employees: RosterEmployee[] }
   | { type: 'status'; network: NetworkState; employees: EmployeeStatus[] }
   | { type: 'paused'; paused: boolean };
 

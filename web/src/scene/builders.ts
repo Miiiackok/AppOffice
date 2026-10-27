@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CELL, CUBICLE, SHARED_ROOMS, type Cubicle, type Desk, type Layout, type Office, type Room } from '../layout';
+import { CELL, CUBICLE, type Cubicle, type Desk, type Layout, type Office, type Room } from '../layout';
 import { PALETTE as P } from './palette';
 import { box, cellCenter, flat, rectCenter } from './util';
 
@@ -11,7 +11,7 @@ export interface CubicleDecor {
 
 export interface OfficeStatic {
   group: THREE.Group;
-  /** 按工位名（office:0、apple:3、temp:2）索引 */
+  /** 按工位名（office:0、shared:1:3、temp:2，见 OfficeModel.keyOf）索引 */
   decor: Map<string, CubicleDecor>;
   /** 双击工位用的隐形碰撞盒，userData.desk 是工位名 */
   seatHitBoxes: THREE.Mesh[];
@@ -82,13 +82,21 @@ export function buildOffice(L: Layout): OfficeStatic {
     seatHitBoxes.push(s.hit);
     owned.push(...s.materials);
   };
+  // 设施牌子和小办公室门牌的贴图是自己画的，拆办公室时一起释放
+  const signTextures: THREE.Texture[] = [];
+  const sign = (text: string, x: number, y: number, z: number) => {
+    const made = addSign(g, text, x, y, z);
+    owned.push(made.material);
+    signTextures.push(made.texture);
+  };
   L.offices.forEach((o, i) => add(`office:${i}`, buildPrivateOffice(g, o)));
-  for (const name of SHARED_ROOMS) {
-    const room = L.rooms[name];
-    if (room.desks.length === 0) continue;
+  L.rooms.forEach((room, r) => {
+    if (room.desks.length === 0) return;
     buildGlassRoom(g, room, P.roomFloor);
-    room.desks.forEach((d, i) => add(`${name}:${i}`, buildSharedDesk(g, d)));
-  }
+    room.desks.forEach((d, i) => add(`shared:${r}:${i}`, buildSharedDesk(g, d)));
+    // 门牌立在北墙玻璃顶上
+    sign(room.name, rectCenter(room.rect)[0], GLASS_H, (room.rect.z + 0.5) * CELL + 0.03);
+  });
   L.cubicles.forEach((c, i) => {
     add(`temp:${i}`, buildCubicle(g, c, i));
     // 每排最后一个隔间右边的挡板
@@ -101,14 +109,9 @@ export function buildOffice(L: Layout): OfficeStatic {
   buildGym(g, L);
   buildPantry(g, L);
   buildLeisure(g, L);
-  // 设施牌子挂在后墙顶上，贴图是自己画的，拆办公室时一起释放
-  const signTextures: THREE.Texture[] = [];
-  const signs = [[L.zones.toilet, '洗手间'], [L.zones.gym, '健身房'], [L.zones.pantry, '茶水间'], [L.zones.leisure, '休闲区']] as const;
-  for (const [zone, text] of signs) {
-    const sign = addSign(g, text, rectCenter(zone)[0]);
-    owned.push(sign.material);
-    signTextures.push(sign.texture);
-  }
+  // 设施牌子挂在后墙顶上
+  const facilities = [[L.zones.toilet, '洗手间'], [L.zones.gym, '健身房'], [L.zones.pantry, '茶水间'], [L.zones.leisure, '休闲区']] as const;
+  for (const [zone, text] of facilities) sign(text, rectCenter(zone)[0], 1.55, 0.08);
   const bounds = new THREE.Box3(new THREE.Vector3(-0.3, 0, -0.3), new THREE.Vector3(W + 0.3, 1.6, D + 0.3));
   return {
     group: g, decor, seatHitBoxes, bounds,
@@ -382,15 +385,18 @@ function buildGym(g: THREE.Group, L: Layout): void {
   for (let i = 0; i < 4; i++) g.add(box(0.12, 0.12, 0.25, P.dumbbell, gx + 1.1 + i * 0.33, 0.45, 0.2));
 }
 
-/** 一块木牌，上面写字；底边搭在后墙顶上，往后仰着对着相机 */
-function addSign(g: THREE.Group, text: string, x: number): { material: THREE.Material; texture: THREE.Texture } {
+/** 一块木牌，上面写字；底边在 (x, y, z)，往后仰着对着相机。字多了牌子跟着变宽 */
+function addSign(g: THREE.Group, text: string, x: number, y: number, z: number): { material: THREE.Material; texture: THREE.Texture } {
+  const font = '700 104px -apple-system, "PingFang SC", sans-serif';
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 160;
   const ctx = canvas.getContext('2d')!;
+  ctx.font = font;
+  canvas.width = Math.max(512, Math.ceil(ctx.measureText(text).width) + 120);
+  canvas.height = 160;
+  // 改了画布尺寸，字体要重新设
+  ctx.font = font;
   ctx.fillStyle = P.signBoard;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.font = '700 104px -apple-system, "PingFang SC", sans-serif';
   ctx.fillStyle = P.signText;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -398,12 +404,13 @@ function addSign(g: THREE.Group, text: string, x: number): { material: THREE.Mat
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const material = new THREE.MeshBasicMaterial({ map: texture });
+  const width = 1.6 * canvas.width / 512;
   const sign = new THREE.Group();
-  sign.position.set(x, 1.55, 0.08);
+  sign.position.set(x, y, z);
   sign.rotation.x = -BOARD_TILT;
-  sign.add(box(1.72, 0.58, 0.04, P.door, 0, 0, -0.02));
+  sign.add(box(width + 0.12, 0.58, 0.04, P.door, 0, 0, -0.02));
   const face = new THREE.Mesh(unitPlane, material);
-  face.scale.set(1.6, 0.5, 1);
+  face.scale.set(width, 0.5, 1);
   face.position.set(0, 0.29, 0.005);
   sign.add(face);
   g.add(sign);

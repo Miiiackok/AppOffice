@@ -18,7 +18,7 @@ final class MessagesTests: XCTestCase {
     }
 
     func testRosterJSON() throws {
-        let msg = OutboundMessage.roster([RosterItem(id: "a", name: "A", kind: .temp, seat: nil, color: "#112233", iconPNG: "iVBO")])
+        let msg = OutboundMessage.roster([], [RosterItem(id: "a", name: "A", kind: .temp, seat: nil, color: "#112233", iconPNG: "iVBO")])
         let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(msg.json().utf8)) as? [String: Any])
         XCTAssertEqual(obj["type"] as? String, "roster")
         let e = try XCTUnwrap((obj["employees"] as? [[String: Any]])?.first)
@@ -31,12 +31,15 @@ final class MessagesTests: XCTestCase {
         XCTAssertEqual(e["iconPNG"] as? String, "iVBO")
     }
 
-    func testRosterJSONWithRoom() throws {
-        let msg = OutboundMessage.roster([RosterItem(id: "a", name: "A", kind: .staff, room: .office, seat: 2,
-                                                     color: "#112233", iconPNG: "")])
+    func testRosterJSONWithRooms() throws {
+        let msg = OutboundMessage.roster([RoomInfo(name: "大办公室", kind: .offices), RoomInfo(name: "生活部", kind: .shared)],
+                                         [RosterItem(id: "a", name: "A", kind: .staff, room: 1, seat: 2, color: "#112233", iconPNG: "")])
         let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(msg.json().utf8)) as? [String: Any])
+        let rooms = try XCTUnwrap(obj["rooms"] as? [[String: Any]])
+        XCTAssertEqual(rooms.map { $0["name"] as? String }, ["大办公室", "生活部"])
+        XCTAssertEqual(rooms.map { $0["kind"] as? String }, ["offices", "shared"])
         let e = try XCTUnwrap((obj["employees"] as? [[String: Any]])?.first)
-        XCTAssertEqual(e["room"] as? String, "office")
+        XCTAssertEqual(e["room"] as? Int, 1)
         XCTAssertEqual(e["seat"] as? Int, 2)
     }
 

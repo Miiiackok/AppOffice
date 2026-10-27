@@ -6,7 +6,7 @@ private struct FakeIcons: IconProviding {
 }
 
 private func entry(_ id: String, seat: Int?) -> RosterEntry {
-    RosterEntry(id: id, name: id.uppercased(), kind: seat == nil ? .temp : .staff, room: seat == nil ? nil : .dock,
+    RosterEntry(id: id, name: id.uppercased(), kind: seat == nil ? .temp : .staff, room: seat == nil ? nil : 1,
                 seat: seat, bundleURL: nil)
 }
 
@@ -34,7 +34,7 @@ final class OfficeFeedTests: XCTestCase {
     func testReadySendsRosterThenStatusThenPaused() {
         var feed = OfficeFeed(icons: FakeIcons())
         _ = feed.update(snap([(a, status("a", .idle))]))
-        XCTAssertEqual(feed.ready(), [.roster([item(a)]), .status(.online, [status("a", .idle)]), .paused(false)])
+        XCTAssertEqual(feed.ready(), [.roster([], [item(a)]), .status(.online, [status("a", .idle)]), .paused(false)])
     }
 
     func testOnlyChangesAfterReady() {
@@ -46,7 +46,7 @@ final class OfficeFeedTests: XCTestCase {
         XCTAssertEqual(feed.update(snap([(a, status("a", .focused, cpu: 50))])),
                        [.status(.online, [status("a", .focused, cpu: 50)])])
         XCTAssertEqual(feed.update(snap([(a, status("a", .focused, cpu: 50)), (t, status("t", .launching))])),
-                       [.roster([item(a), item(t)]), .status(.online, [status("t", .launching)])])
+                       [.roster([], [item(a), item(t)]), .status(.online, [status("t", .launching)])])
     }
 
     func testReadyAgainResendsEverything() {
@@ -54,14 +54,14 @@ final class OfficeFeedTests: XCTestCase {
         let s1 = snap([(a, status("a", .idle))])
         _ = feed.update(s1)
         _ = feed.ready()
-        XCTAssertEqual(feed.ready(), [.roster([item(a)]), .status(.online, [status("a", .idle)]), .paused(false)])
+        XCTAssertEqual(feed.ready(), [.roster([], [item(a)]), .status(.online, [status("a", .idle)]), .paused(false)])
     }
 
     func testReadyBeforeAnySnapshot() {
         var feed = OfficeFeed(icons: FakeIcons())
         XCTAssertEqual(feed.ready(), [.paused(false)])
         XCTAssertEqual(feed.update(snap([(a, status("a", .idle))])),
-                       [.roster([item(a)]), .status(.online, [status("a", .idle)])])
+                       [.roster([], [item(a)]), .status(.online, [status("a", .idle)])])
     }
 
     func testPausedOnlyWhenChangedAndReady() {
@@ -90,6 +90,15 @@ final class OfficeFeedTests: XCTestCase {
         _ = feed.ready()
         XCTAssertEqual(feed.update(snap(pairs, network: .offline)), [.status(.offline, [])])
         XCTAssertEqual(feed.update(snap(pairs, network: .offline)), [])
+    }
+
+    func testRenamedRoomResendsRoster() {
+        var feed = OfficeFeed(icons: FakeIcons())
+        _ = feed.update(snap([(a, status("a", .idle))]))
+        _ = feed.ready()
+        var renamed = snap([(a, status("a", .idle))])
+        renamed.rooms = [RoomInfo(name: "生活部", kind: .shared)]
+        XCTAssertEqual(feed.update(renamed), [.roster(renamed.rooms, [item(a)])])
     }
 
     func testResetWaitsForNextReady() {

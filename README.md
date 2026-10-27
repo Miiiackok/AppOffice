@@ -16,15 +16,29 @@ scripts/build-app.sh --install
 
 ## 怎么玩
 
-**员工是谁**：名单写在 `Sources/OfficeCore/Roster.swift`（`Roster.rooms`），装了就有座位，和 Dock 里有没有无关；打开、干活都在自己的座位上。地毯颜色是图标主色，看板挂着图标。想换成自己的名单：改 `Roster.rooms` 再跑一次 `scripts/build-app.sh --install`。
+**员工是谁**：谁坐哪由房间名单 `~/Library/Application Support/AppOffice/rooms.json` 决定。菜单栏 →「编辑房间名单…」打开它，改完保存，办公室马上重新排座。名单上的 app 装了就有座位，打开、干活都在自己的座位上；没装的跳过。地毯颜色是图标主色，看板挂着图标。
 
-| 房间 | 谁 |
+```json
+{
+  "offices": ["Google Chrome", "Claude", "ChatGPT", "WeChat"],
+  "rooms": [
+    { "name": "生活部", "apps": ["Phone", "Calendar", "Notes", "Mail"] },
+    { "name": "办公部", "apps": ["Keynote", "Numbers", "Pages"] },
+    { "name": "Dock 部", "apps": ["Finder", "Safari"], "dock": true }
+  ]
+}
+```
+
+| 写法 | 意思 |
 |---|---|
-| 大办公室（一人一间，玻璃墙） | Google Chrome、Claude、ChatGPT、WeChat |
-| 小办公室 · 12 人（一人一张桌子） | 电话、日历、通讯录、备忘录、提醒事项、TV、音乐、照片、FaceTime、信息、邮件、游戏 |
-| 小办公室 · 7 人 | Keynote、Numbers、Pages、App Store、iPhone 镜像、Siri、系统设置 |
-| 小办公室 · Dock | 访达、启动台、Safari、地图，以及 Dock 里其他不在名单上的 app |
-| 下面的独立隔间 | 临时工：其他打开的 app，从大门走进来，一人一个隔间，开几个就有几个 |
+| `offices` | 每个 app 一间玻璃墙大办公室（一排放 4 间，多了换行） |
+| `rooms` | 合用的小办公室，按顺序排，一人一张桌子；`name` 挂在门口 |
+| `"dock": true` | Dock 里不在名单上的 app 也坐进这间；没有哪间这么写，它们就只在打开时当临时工 |
+| app 名字 | 和「应用程序」文件夹或 Dock 上看到的名字一样（不分大小写，中文名也行），也可以写 bundle id，比如 `com.google.Chrome` |
+
+- 第一次打开时如果没有这个文件，会按你的 Dock 生成一个：一间叫 Dock 的小办公室，没有大办公室。
+- 写错了（少个逗号、引号）会弹通知说第几行，办公室先按上一版排；文本编辑自动换成的弯引号和末尾多余的逗号会自动忽略。
+- 不在名单上、也不在 Dock 里的 app：打开时是临时工，从大门走进来，坐下面的独立隔间，开几个就有几个。
 
 | 员工在干嘛 | 说明 app 在 |
 |---|---|

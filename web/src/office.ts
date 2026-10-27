@@ -1,6 +1,6 @@
 import { Facility, Roaming, type Place } from './facilities';
-import { computeLayout, NO_COUNTS, sameCounts, type Desk, type Layout, type LeisureKind, type RoomCounts, type Spot } from './layout';
-import type { EmployeeState, EmployeeStatus, NetworkState, RosterEmployee } from './protocol';
+import { computeLayout, EMPTY_SPEC, sameSpec, type Desk, type Layout, type LayoutSpec, type LeisureKind, type Spot } from './layout';
+import type { EmployeeState, EmployeeStatus, NetworkState, RoomInfo, RosterEmployee } from './protocol';
 
 export type Activity = 'slack' | 'idle' | 'type' | 'boot' | 'toilet' | 'wait' | 'run' | 'pushup' | 'eat' | 'sofa'
   | 'arcade' | 'lounge' | 'watch';
@@ -46,17 +46,13 @@ export function deskActivity(state: EmployeeState): Activity {
   }
 }
 
-/** 工位的名字（office:0、apple:3、temp:2）：场景里的装饰和点击盒靠它找主人 */
-export function deskKey(e: Employee, tempSeat: number | undefined): string | null {
-  if (e.info.kind === 'temp') return tempSeat === undefined ? null : `temp:${tempSeat}`;
-  return e.info.room && e.info.seat !== null ? `${e.info.room}:${e.info.seat}` : null;
-}
-
 /** 排队的人比位置多时，多出来的都站在最后一个位置 */
 const pick = <T extends Spot>(spots: T[], i: number): T => spots[Math.min(i, spots.length - 1)];
 
 export class OfficeModel {
-  layout: Layout = computeLayout(NO_COUNTS);
+  layout: Layout = computeLayout(EMPTY_SPEC);
+  /** roster 消息里的房间，下标就是员工的 room */
+  rooms: RoomInfo[] = [];
   network: NetworkState = 'online';
   private readonly employees = new Map<string, Employee>();
   private readonly facilities: Record<FacilityName, Facility> = {
@@ -80,9 +76,17 @@ export class OfficeModel {
     return this.employees.get(id);
   }
 
+  /** 工位的名字，和场景里的装饰、点击盒对得上：office:0 是第 0 间大办公室，shared:1:3 是第 1 间小办公室的第 3 个座位，temp:2 是第 2 个临时工隔间 */
   keyOf(id: string): string | null {
     const e = this.employees.get(id);
-    return e ? deskKey(e, this.tempSeats.get(id)) : null;
+    if (!e) return null;
+    if (e.info.kind === 'temp') {
+      const seat = this.tempSeats.get(id);
+      return seat === undefined ? null : `temp:${seat}`;
+    }
+    const { room, seat } = e.info;
+    if (room === null || seat === null || !this.rooms[room]) return null;
+    return this.rooms[room].kind === 'offices' ? `office:${seat}` : `shared:${this.sharedIndex(room)}:${seat}`;
   }
 
   ownerOf(key: string): string | null {
@@ -90,7 +94,8 @@ export class OfficeModel {
     return null;
   }
 
-  applyRoster(list: RosterEmployee[]): { added: string[]; removed: string[]; layoutChanged: boolean } {
+  applyRoster(rooms: RoomInfo[], list: RosterEmployee[]): { added: string[]; removed: string[]; layoutChanged: boolean } {
+    this.rooms = rooms;
     const incoming = new Set(list.map(e => e.id));
     const removed = this.ids().filter(id => !incoming.has(id));
     for (const id of removed) this.forget(id);
@@ -108,10 +113,10 @@ export class OfficeModel {
       }
       if (info.kind === 'temp' && !this.tempSeats.has(info.id)) this.tempSeats.set(info.id, this.freeTempSeat());
     }
-    const counts = this.counts();
-    const layoutChanged = !sameCounts(counts, this.layout.counts);
+    const spec = this.spec();
+    const layoutChanged = !sameSpec(spec, this.layout.spec);
     if (layoutChanged) {
-      this.layout = computeLayout(counts);
+      this.layout = computeLayout(spec);
       this.leisure.resize(this.layout.leisure.spots.length);
     }
     return { added, removed, layoutChanged };
@@ -163,19 +168,31 @@ export class OfficeModel {
       return seat === undefined ? undefined : L.cubicles[seat];
     }
     const { room, seat } = e.info;
-    if (!room || seat === null) return undefined;
-    return room === 'office' ? L.offices[seat]?.desks[0] : L.rooms[room].desks[seat];
+    if (room === null || seat === null || !this.rooms[room]) return undefined;
+    if (this.rooms[room].kind === 'offices') return L.offices[seat]?.desks[0];
+    return L.rooms[this.sharedIndex(room)]?.desks[seat];
+  }
+
+  /** 第 room 个房间是第几间小办公室 */
+  private sharedIndex(room: number): number {
+    return this.rooms.slice(0, room).filter(r => r.kind === 'shared').length;
   }
 
   /** 每个房间要几个座位：按最大的座位号算，名单有空号也不会坐错 */
-  private counts(): RoomCounts {
-    const c: RoomCounts = { ...NO_COUNTS };
+  private spec(): LayoutSpec {
+    const seats = this.rooms.map(() => 0);
     for (const e of this.employees.values()) {
       const { room, seat } = e.info;
-      if (e.info.kind === 'staff' && room && seat !== null) c[room] = Math.max(c[room], seat + 1);
+      if (e.info.kind === 'staff' && room !== null && seat !== null && room < seats.length) {
+        seats[room] = Math.max(seats[room], seat + 1);
+      }
     }
-    for (const seat of this.tempSeats.values()) c.temp = Math.max(c.temp, seat + 1);
-    return c;
+    const temp = Math.max(0, ...[...this.tempSeats.values()].map(s => s + 1));
+    return {
+      offices: this.rooms.reduce((n, r, i) => (r.kind === 'offices' ? n + seats[i] : n), 0),
+      rooms: this.rooms.flatMap((r, i) => (r.kind === 'shared' ? [{ name: r.name, desks: seats[i] }] : [])),
+      temp,
+    };
   }
 
   private freeTempSeat(): number {

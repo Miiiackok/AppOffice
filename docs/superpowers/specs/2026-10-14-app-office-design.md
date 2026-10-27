@@ -17,7 +17,7 @@
 
 | 类型 | 来源 | 工位 |
 |---|---|---|
-| 正式员工 | 写死的房间名单（`Roster.rooms`）里装了的 app + Dock 中固定的其他 app（读 `com.apple.dock` 的 `persistent-apps`） | 按房间坐，见下 |
+| 正式员工 | 房间名单 `rooms.json` 里装了的 app，加上 Dock 中固定的其他 app（读 `com.apple.dock` 的 `persistent-apps`，坐进标了 `"dock": true` 的房间） | 按房间坐，见下 |
 | 临时工 | 正在运行、`activationPolicy == .regular`、但不在名单也不在 Dock 固定列表里的 app | 一人一个独立隔间，开几个建几个 |
 
 > 2026-10-25 改版：原来正式员工按 Dock 顺序坐隔间、临时工坐开放长桌和沙发，结果在干活的 app 坐长桌、没开的反而占隔间。现在改成按房间：
@@ -30,6 +30,8 @@
 > | `dock` | 访达、启动台、Safari、地图，然后是 Dock 里其他不在名单上的 app | 同上，人多了房间变宽 |
 >
 > 名单上的 app 没在 Dock 里、也没运行时，用 LaunchServices 找它装在哪（每 10 秒一次）；没装就跳过。不管开没开、在不在干活，都坐自己的座位。
+>
+> 2026-10-27 改：名单搬到 `~/Library/Application Support/AppOffice/rooms.json`（README 有写法），房间数量和名字都能改：`offices` 一排大办公室（4 间一排，多了换行），`rooms` 一间间小办公室（一排放不下 59 列就换行，名字挂在北墙玻璃顶上）。app 写名字或 bundle id，按 Dock → 运行中 → 已安装（扫应用程序文件夹，一分钟一次）的顺序对。没有文件就按 Dock 生成；每秒看一眼修改时间，改了马上重排；写坏了弹通知、沿用上一版。roster 消息多一个 `rooms` 数组，员工的 `room` 是它的下标。
 
 - Dock 固定列表变化时重新排座（每 10 秒检查一次）。
 - 每个员工的 `id` 是 bundle identifier。
@@ -156,8 +158,9 @@ Swift → JS（`window.office.receive(msg)`）：
 
 ```json
 { "type": "roster",
+  "rooms": [{ "name": "大办公室", "kind": "offices" }, { "name": "Dock 部", "kind": "shared" }],
   "employees": [{ "id": "com.apple.Safari", "name": "Safari", "kind": "staff",
-                  "room": "dock", "seat": 2, "color": "#3D7BFD", "iconPNG": "<base64, 64×64>" }] }
+                  "room": 1, "seat": 2, "color": "#3D7BFD", "iconPNG": "<base64, 64×64>" }] }
 
 { "type": "status",
   "network": "online",
@@ -167,7 +170,8 @@ Swift → JS（`window.office.receive(msg)`）：
 
 - `roster` 只在名单变化时发送（含图标）；`status` 每秒发送，只含有变化的员工。
 - `launchedAt` 为 app 启动时间（Unix 秒，未运行时为 `null`），已运行时长由 JS 自行计算，避免每秒都算"有变化"。
-- `kind`：`"staff"` 或 `"temp"`。`room`：正式员工的房间（`office` / `apple` / `tools` / `dock`）；`seat`：在房间里的座位序号（`office` 里是第几间）。临时工两个都是 `null`，由 JS 分配隔间。
+- `rooms`：`[{ "name": "大办公室", "kind": "offices" }, { "name": "生活部", "kind": "shared" }, …]`，第 0 个总是大办公室那排。
+- `kind`：`"staff"` 或 `"temp"`。`room`：正式员工的房间（`rooms` 的下标）；`seat`：在房间里的座位序号（大办公室里是第几间）。临时工两个都是 `null`，由 JS 分配隔间。
 
 ```json
 { "type": "paused", "paused": true }

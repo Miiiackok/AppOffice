@@ -44,28 +44,32 @@ public struct ProcessMetrics: Equatable, Sendable {
     public static let zero = ProcessMetrics(cpuPercent: 0, memoryBytes: 0)
 }
 
-/// 正式员工坐哪个房间（名单见 Roster.rooms）
-public enum Room: String, Codable, Sendable, CaseIterable {
-    /// 常用 app，每人一间大办公室
-    case office
-    /// 不常用的 12 个，合用一间小办公室
-    case apple
-    /// iWork、App Store、iPhone 镜像、Siri、系统设置，合用一间小办公室
-    case tools
-    /// 访达、启动台、Safari、地图，以及 Dock 里其他不在名单上的 app
-    case dock
+/// 办公室里的一个房间（来自 rooms.json）：offices 是一排大办公室、每人一间；shared 是合用的小办公室
+public struct RoomInfo: Codable, Equatable, Sendable {
+    public enum Kind: String, Codable, Sendable {
+        case offices, shared
+    }
+
+    public var name: String
+    public var kind: Kind
+
+    public init(name: String, kind: Kind) {
+        self.name = name
+        self.kind = kind
+    }
 }
 
-/// 名单上的一个员工：正式员工坐 room 里的第 seat 个位置，临时工 room 和 seat 都是 nil
+/// 名单上的一个员工：正式员工坐第 room 个房间（OfficeSnapshot.rooms 的下标）里的第 seat 个位置，
+/// 临时工 room 和 seat 都是 nil
 public struct RosterEntry: Equatable, Sendable {
     public var id: String
     public var name: String
     public var kind: EmployeeKind
-    public var room: Room?
+    public var room: Int?
     public var seat: Int?
     public var bundleURL: URL?
 
-    public init(id: String, name: String, kind: EmployeeKind, room: Room? = nil, seat: Int?, bundleURL: URL?) {
+    public init(id: String, name: String, kind: EmployeeKind, room: Int? = nil, seat: Int?, bundleURL: URL?) {
         self.id = id
         self.name = name
         self.kind = kind

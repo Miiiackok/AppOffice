@@ -79,8 +79,8 @@ final class WebBridge: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     /// 日志里只打摘要：roster 带图标很长
     private static func summary(_ message: OutboundMessage, bytes: Int) -> String {
         switch message {
-        case .roster(let employees):
-            return "roster \(employees.count) employees, \(bytes) bytes"
+        case .roster(let rooms, let employees):
+            return "roster \(rooms.count) rooms, \(employees.count) employees, \(bytes) bytes"
         case .status(let network, let employees):
             let states = employees.map { "\($0.id)=\($0.state.rawValue)" }.joined(separator: ", ")
             return "status \(network.rawValue) [\(states)]"

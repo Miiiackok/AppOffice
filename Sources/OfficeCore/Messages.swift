@@ -30,13 +30,13 @@ public struct RosterItem: Encodable, Equatable, Sendable {
     public var id: String
     public var name: String
     public var kind: EmployeeKind
-    public var room: Room?
+    public var room: Int?
     public var seat: Int?
     public var color: String
     /// 128×128 PNG 的 base64，不带 data: 前缀
     public var iconPNG: String
 
-    public init(id: String, name: String, kind: EmployeeKind, room: Room? = nil, seat: Int?, color: String, iconPNG: String) {
+    public init(id: String, name: String, kind: EmployeeKind, room: Int? = nil, seat: Int?, color: String, iconPNG: String) {
         self.id = id
         self.name = name
         self.kind = kind
@@ -63,7 +63,7 @@ public struct RosterItem: Encodable, Equatable, Sendable {
 
 /// 推给网页的消息
 public enum OutboundMessage: Equatable, Sendable {
-    case roster([RosterItem])
+    case roster([RoomInfo], [RosterItem])
     case status(NetworkState, [EmployeeStatus])
     case paused(Bool)
 
@@ -72,8 +72,8 @@ public enum OutboundMessage: Equatable, Sendable {
         encoder.outputFormatting = [.sortedKeys]
         let data: Data
         switch self {
-        case .roster(let employees):
-            data = try! encoder.encode(RosterBody(type: "roster", employees: employees))
+        case .roster(let rooms, let employees):
+            data = try! encoder.encode(RosterBody(type: "roster", rooms: rooms, employees: employees))
         case .status(let network, let employees):
             data = try! encoder.encode(StatusBody(type: "status", network: network, employees: employees))
         case .paused(let paused):
@@ -83,6 +83,6 @@ public enum OutboundMessage: Equatable, Sendable {
     }
 }
 
-private struct RosterBody: Encodable { let type: String; let employees: [RosterItem] }
+private struct RosterBody: Encodable { let type: String; let rooms: [RoomInfo]; let employees: [RosterItem] }
 private struct StatusBody: Encodable { let type: String; let network: NetworkState; let employees: [EmployeeStatus] }
 private struct PausedBody: Encodable { let type: String; let paused: Bool }

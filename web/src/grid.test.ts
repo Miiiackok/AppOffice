@@ -60,10 +60,11 @@ describe('findPath', () => {
   });
 
   it('reaches every spot in the office from the door', () => {
+    const rooms = [{ name: 'A', desks: 12 }, { name: 'B', desks: 7 }, { name: 'C', desks: 4 }];
     const shapes = [
-      { office: 4, apple: 12, tools: 7, dock: 4, temp: 3 },
-      { office: 1, apple: 0, tools: 1, dock: 9, temp: 0 },
-      { office: 4, apple: 12, tools: 7, dock: 4, temp: 20 },
+      { offices: 4, rooms, temp: 3 },
+      { offices: 1, rooms: [{ name: 'A', desks: 0 }, { name: 'B', desks: 1 }, { name: 'C', desks: 9 }], temp: 0 },
+      { offices: 7, rooms: [...rooms, ...rooms], temp: 20 },
     ];
     for (const counts of shapes) {
       const L = computeLayout(counts);

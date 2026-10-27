@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             self.latest = snapshot
             self.bridge?.send(self.feed.update(snapshot))
         }
+        loop.onRoomsProblem = { [weak self] message in self?.notify(message) }
         loop.start()
         bridge?.load()
         if defaults.bool(forKey: "showOffice") { panel.orderFrontRegardless() }
@@ -115,13 +116,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         switch (action, operation) {
         case (.launch(let id), .none), (.activate(let id), .none):
             let name = roster.first(where: { $0.id == id })?.name ?? id
-            notifyLaunchFailed("找不到这个 app：\(name)")
+            notify("找不到这个 app：\(name)")
         default:
-            AppControl.perform(operation, bundleID: appID) { [weak self] message in self?.notifyLaunchFailed(message) }
+            AppControl.perform(operation, bundleID: appID) { [weak self] message in self?.notify(message) }
         }
     }
 
-    private func notifyLaunchFailed(_ message: String) {
+    /// 打不开 app、rooms.json 写坏了这类事弹个横幅
+    private func notify(_ message: String) {
         NSLog("AppOffice: %@", message)
         // swift run 时没有 bundle id，用不了通知中心
         guard Bundle.main.bundleIdentifier != nil else { return }
@@ -221,7 +223,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             simulate: { [weak self] id, state in
                 guard let self else { return }
                 self.bridge?.send(self.feed.simulate(id, state))
-            })
+            },
+            editRooms: { [weak self] in self?.editRooms() })
+    }
+
+    /// 用文本编辑器打开 rooms.json；保存后下一拍就重新排座
+    private func editRooms() {
+        let url = loop.roomsFile.url
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            notify("房间名单还没生成，过一秒再试")
+            return
+        }
+        // .json 没有默认程序时用文本编辑打开
+        let editor = NSWorkspace.shared.urlForApplication(toOpen: url)
+            ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.TextEdit")
+        guard let editor else {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+            return
+        }
+        NSWorkspace.shared.open([url], withApplicationAt: editor, configuration: NSWorkspace.OpenConfiguration())
     }
 
     /// 第一次只弹系统的辅助功能授权提示；系统之后不会再弹，所以再点就直接打开系统设置对应页面

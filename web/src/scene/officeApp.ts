@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CELL } from '../layout';
 import { isClosed, OfficeModel } from '../office';
-import type { InboundMessage, RosterEmployee } from '../protocol';
+import type { InboundMessage, RoomInfo, RosterEmployee } from '../protocol';
 import { Agent } from './agent';
 import { buildOffice, type OfficeStatic } from './builders';
 import { iconTexture, setIconAnisotropy } from './icons';
@@ -33,7 +33,7 @@ export class OfficeApp {
   handle(msg: InboundMessage): void {
     switch (msg.type) {
       case 'roster':
-        this.applyRoster(msg.employees);
+        this.applyRoster(msg.rooms, msg.employees);
         return;
       case 'status':
         this.model.applyStatus(msg.network, msg.employees);
@@ -90,8 +90,8 @@ export class OfficeApp {
     return near;
   }
 
-  private applyRoster(list: RosterEmployee[]): void {
-    const { removed, layoutChanged } = this.model.applyRoster(list);
+  private applyRoster(rooms: RoomInfo[], list: RosterEmployee[]): void {
+    const { removed, layoutChanged } = this.model.applyRoster(rooms, list);
     for (const e of list) this.ensureIcon(e);
     if (layoutChanged || !this.office) this.rebuildOffice();
     const L = this.model.layout;
