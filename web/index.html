@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AppOffice</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #DDE5DA;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+        -webkit-user-select: none; user-select: none; }
+      #app { position: relative; width: 100%; height: 100%; }
+      canvas { display: block; }
+      .card { position: absolute; min-width: 150px; padding: 10px 12px; border-radius: 10px;
+        background: #FFFDF8; color: #3A3530; font-size: 12px; line-height: 1.6;
+        box-shadow: 0 4px 14px rgba(40, 35, 25, 0.18); pointer-events: none; }
+      .card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+      .card-head strong { font-size: 13px; }
+      .card-kind { margin-left: auto; color: #8A8178; font-size: 11px; }
+      .card-state { font-weight: 600; }
+      .card-hint { margin-top: 4px; color: #8A8178; font-size: 11px; }
+      .mock-panel { position: absolute; top: 8px; left: 8px; display: flex; flex-wrap: wrap; gap: 4px;
+        max-width: 60%; opacity: 0.85; }
+      .mock-panel button { font: inherit; font-size: 11px; padding: 3px 7px; border: 0; border-radius: 6px;
+        background: #FFFDF8; color: #3A3530; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
